@@ -1,0 +1,3 @@
+C:\Users\marti\OneDrive\Desktop\FACU\QUINTO\TC\FINAL\TC-A\src\main\java\com\example\cpplexer\LexerMain.java
+C:\Users\marti\OneDrive\Desktop\FACU\QUINTO\TC\FINAL\TC-A\src\main\java\com\example\cpplexer\TokenInfo.java
+C:\Users\marti\OneDrive\Desktop\FACU\QUINTO\TC\FINAL\TC-A\target\generated-sources\antlr4\com\example\cpplexer\CppSubsetLexer.java
