@@ -46,8 +46,12 @@ RPAREN: ')';
 LBRACE: '{';
 RBRACE: '}';
 
-// Literals
-FLOAT_LITERAL: [0-9]+ '.' [0-9]+ ([eE] [+-]? [0-9]+)?;
+// Literals 
+FLOAT_LITERAL
+    : [0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
+    | '.' [0-9]+ ([eE] [+-]? [0-9]+)?
+    | [0-9]+ [eE] [+-]? [0-9]+
+    ;
 INT_LITERAL: [0-9]+;
 
 CHAR_LITERAL

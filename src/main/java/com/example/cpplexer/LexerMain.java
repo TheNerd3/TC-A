@@ -1,12 +1,12 @@
 package com.example.cpplexer;
 
-import org.antlr.v4.runtime.CharStream;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.Token;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.Token;
 
 public class LexerMain {
     private static final String ANSI_RESET = "\u001B[0m";
@@ -25,6 +25,9 @@ public class LexerMain {
         try {
             CharStream input = CharStreams.fromFileName(path);
             CppSubsetLexer lexer = new CppSubsetLexer(input);
+            lexer.removeErrorListeners();
+            LexerErrorListener lexErrors = new LexerErrorListener();
+            lexer.addErrorListener(lexErrors);
 
             List<? extends Token> tokens = lexer.getAllTokens();
             List<TokenInfo> tokenList = new ArrayList<>();
@@ -49,6 +52,14 @@ public class LexerMain {
 
             // Imprimir tabla de tokens
             printTable(tokenList);
+
+            // Añadir errores capturados por el listener (unterminated strings, etc.)
+            if (!lexErrors.getErrors().isEmpty()) {
+                for (LexerErrorListener.LexError le : lexErrors.getErrors()) {
+                    TokenInfo info = new TokenInfo("LEXER_ERROR", le.msg, le.line, le.charPositionInLine);
+                    errors.add(info);
+                }
+            }
 
             if (!errors.isEmpty()) {
                 System.out.println();
