@@ -5,10 +5,13 @@ package com.example.cpplexer;
 }
 
 // Keywords (placed before IDENTIFIER to match keywords first)
+// Data types
 INT: 'int';
 CHAR: 'char';
 DOUBLE: 'double';
 VOID: 'void';
+
+// Reserved words
 IF: 'if';
 ELSE: 'else';
 FOR: 'for';
@@ -22,6 +25,10 @@ EQEQ: '==';
 NEQ: '!=';
 LE: '<=';
 GE: '>=';
+PE: '+=';
+ME: '-=';
+MULE: '*=';
+DIVE: '/=';
 ANDAND: '&&';
 OROR: '||';
 PLUSPLUS: '++';
@@ -49,7 +56,7 @@ RBRACE: '}';
 // Literals 
 FLOAT_LITERAL
     : [0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
-    | '.' [0-9]+ ([eE] [+-]? [0-9]+)?
+    | [0] '.' [0-9]+ ([eE] [+-]? [0-9]+)?
     | [0-9]+ [eE] [+-]? [0-9]+
     ;
 INT_LITERAL: [0-9]+;
