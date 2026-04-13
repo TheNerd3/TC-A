@@ -1,7 +1,7 @@
 lexer grammar CppSubsetLexer;
 
 @header {
-package com.example.cpplexer;
+    package com.example.cpplexer;
 }
 
 // Keywords (placed before IDENTIFIER to match keywords first)
@@ -55,11 +55,11 @@ RBRACE: '}';
 
 // Literals 
 FLOAT_LITERAL
-    : [0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
-    | [0] '.' [0-9]+ ([eE] [+-]? [0-9]+)?
-    | [0-9]+ [eE] [+-]? [0-9]+
+    : [+-]?[0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
+    | [+-]?[0] '.' [0-9]+ ([eE] [+-]? [0-9]+)?
+    | [+-]?[0-9]+ [eE] [+-]? [0-9]+
     ;
-INT_LITERAL: [0-9]+;
+INT_LITERAL: [+-]?[0-9]+;
 
 CHAR_LITERAL
     : '\'' ( ~[\\'\r\n] | '\\' . ) '\''
