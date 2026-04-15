@@ -22,6 +22,16 @@ BREAK: 'break';
 CONTINUE: 'continue';
 RETURN: 'return';
 
+fragment YEAR : [0-9];
+fragment MONTH
+    : '0' [1-9]
+    | '1' [0-2];
+fragment DAY
+    : '0' [1-9]
+    | [12] [0-9]
+    | '3' [01]
+    ;
+
 // Multi-character operators
 EQEQ: '==';
 NEQ: '!=';
@@ -56,6 +66,8 @@ LBRACE: '{';
 RBRACE: '}';
 LBRACK: '[';
 RBRACK: ']';
+//SQUOTE: '\'';
+DQUOTE: '"';
 
 // Literals 
 FLOAT_LITERAL
@@ -74,7 +86,8 @@ STRING_LITERAL
     ;
 
 DATE_LITERAL
-    : '\'' [0-9]{4} '-' [0-9]{2} '-' [0-9]{2} '\''
+    : '\'' YEAR '-' MONTH '-' DAY '\'' // formato ISO 8601
+    | '\'' DAY '-' MONTH '-' YEAR '\'' // formato arg
     ;   
 DOUBLE_LITERAL
     : [+-]?[0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
