@@ -66,7 +66,7 @@ LBRACE: '{';
 RBRACE: '}';
 LBRACK: '[';
 RBRACK: ']';
-//SQUOTE: '\'';
+SQUOTE: '\'';
 DQUOTE: '"';
 
 // Literals 
@@ -94,7 +94,13 @@ DOUBLE_LITERAL
     | [+-]?[0] '.' [0-9]+ ([eE] [+-]? [0-9]+)?
     | [+-]?[0-9]+ [eE] [+-]? [0-9]+
     ;
-    
+
+BOOL_LITERAL
+    : 'TRUE'
+    | 'FALSE'
+    | [01]
+    ;
+
 // Identifier
 IDENTIFIER: [a-zA-Z_] [a-zA-Z0-9_]*;
 

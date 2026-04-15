@@ -7,5 +7,6 @@ int main() {
   int y = 20;
   int z = add(x, y);
   date nacimiento = '2002-13-17';
+  bool estado = TRUE;
   return 0;
 }
