@@ -10,6 +10,8 @@ INT: 'int';
 CHAR: 'char';
 DOUBLE: 'double';
 VOID: 'void';
+DATE: 'date';
+BOOL: 'bool';
 
 // Reserved words
 IF: 'if';
@@ -52,6 +54,8 @@ LPAREN: '(';
 RPAREN: ')';
 LBRACE: '{';
 RBRACE: '}';
+LBRACK: '[';
+RBRACK: ']';
 
 // Literals 
 FLOAT_LITERAL
@@ -69,6 +73,15 @@ STRING_LITERAL
     : '"' ( ~[\\"\r\n] | '\\' . )* '"'
     ;
 
+DATE_LITERAL
+    : '\'' [0-9]{4} '-' [0-9]{2} '-' [0-9]{2} '\''
+    ;   
+DOUBLE_LITERAL
+    : [+-]?[0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
+    | [+-]?[0] '.' [0-9]+ ([eE] [+-]? [0-9]+)?
+    | [+-]?[0-9]+ [eE] [+-]? [0-9]+
+    ;
+    
 // Identifier
 IDENTIFIER: [a-zA-Z_] [a-zA-Z0-9_]*;
 
