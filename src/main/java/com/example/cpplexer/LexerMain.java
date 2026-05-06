@@ -6,7 +6,9 @@ import java.util.List;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ParseTree;
 
 public class LexerMain {
     private static final String ANSI_RESET = "\u001B[0m";
@@ -14,7 +16,7 @@ public class LexerMain {
     private static final String ANSI_GREEN = "\u001B[32m";
     private static final String ANSI_YELLOW = "\u001B[33m";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         if (args.length == 0) {
             System.err.println("Uso: java com.example.cpplexer.LexerMain <archivoFuente>");
             System.exit(1);
@@ -23,17 +25,23 @@ public class LexerMain {
         String path = args[0];
 
         try {
+            // 1. ANÁLISIS LÉXICO
             CharStream input = CharStreams.fromFileName(path);
             CppSubsetLexer lexer = new CppSubsetLexer(input);
+
             lexer.removeErrorListeners();
             LexerErrorListener lexErrors = new LexerErrorListener();
             lexer.addErrorListener(lexErrors);
 
-            List<? extends Token> tokens = lexer.getAllTokens();
+            // En lugar de getAllTokens() (que vacía el lexer), usamos CommonTokenStream
+            // Esto nos permite imprimir la tabla Y LUEGO usar el parser con los mismos tokens.
+            CommonTokenStream tokens = new CommonTokenStream(lexer);
+            tokens.fill(); // Lee todos los tokens en memoria
+
             List<TokenInfo> tokenList = new ArrayList<>();
             List<TokenInfo> errors = new ArrayList<>();
 
-            for (Token t : tokens) {
+            for (Token t : tokens.getTokens()) {
                 if (t.getType() == Token.EOF) continue;
 
                 String typeName = CppSubsetLexer.VOCABULARY.getSymbolicName(t.getType());
@@ -53,7 +61,7 @@ public class LexerMain {
             // Imprimir tabla de tokens
             printTable(tokenList);
 
-            // Añadir errores capturados por el listener (unterminated strings, etc.)
+            // Añadir errores capturados por el listener
             if (!lexErrors.getErrors().isEmpty()) {
                 for (LexerErrorListener.LexError le : lexErrors.getErrors()) {
                     TokenInfo info = new TokenInfo("LEXER_ERROR", le.msg, le.line, le.charPositionInLine);
@@ -61,6 +69,7 @@ public class LexerMain {
                 }
             }
 
+            // Verificar si hubo errores léxicos
             if (!errors.isEmpty()) {
                 System.out.println();
                 System.out.println(color(ANSI_RED, "ERRORES LÉXICOS DETECTADOS:"));
@@ -73,6 +82,22 @@ public class LexerMain {
             } else {
                 System.out.println();
                 System.out.println(color(ANSI_GREEN, "Análisis léxico completado correctamente. Sin errores léxicos."));
+
+                // ---------------------------------------------------------
+                // 2. ANÁLISIS SINTÁCTICO Y SEMÁNTICO
+                // ---------------------------------------------------------
+                System.out.println("\n" + color(ANSI_YELLOW, "--- Iniciando Análisis Sintáctico y Semántico ---"));
+
+                // Reiniciamos el puntero de los tokens a 0 para que el parser los lea desde el principio
+                tokens.seek(0);
+
+                CppSubsetParser parser = new CppSubsetParser(tokens);
+                ParseTree tree = parser.program(); // Empezamos a leer desde la regla raíz (program)
+
+                // Ejecutamos nuestro Visitor Semántico
+                System.out.println("--- Resultados de ejecución en memoria ---");
+                SemanticVisitor visitor = new SemanticVisitor();
+                visitor.visit(tree);
             }
 
         } catch (IOException e) {

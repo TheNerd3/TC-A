@@ -49,17 +49,15 @@ block
     : LBRACE statement* RBRACE
     ;
 
-// Minimal statement set so parser rules referring to statement compileable
 statement
-    : variableDecl
-    | block
-    | SEMI
-    | RETURN expression? SEMI
+    : IDENTIFIER '=' expression SEMI   # Assign
+    | expression SEMI                  # PrintExpr
     ;
 
 expression
-    : IDENTIFIER
-    | INT_LITERAL
-    | STRING_LITERAL
-    | CHAR_LITERAL
+    : expression op=('*'|'/') expression # MulDiv
+    | expression op=('+'|'-') expression # AddSub
+    | INT_LITERAL                        # Int
+    | IDENTIFIER                         # Id
+    | LPAREN expression RPAREN           # Parens
     ;
