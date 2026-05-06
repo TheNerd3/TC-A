@@ -1,9 +1,5 @@
 lexer grammar CppSubsetLexer;
 
-@header {
-    package com.example.cpplexer;
-}
-
 // Keywords (placed before IDENTIFIER to match keywords first)
 // Data types
 INT: 'int';

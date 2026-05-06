@@ -2,10 +2,6 @@ parser grammar CppSubsetParser;
 
 options { tokenVocab=CppSubsetLexer; }
 
-@header {
-    package com.example.cpplexer;
-}
-
 program
     : globalItem* EOF
     ;

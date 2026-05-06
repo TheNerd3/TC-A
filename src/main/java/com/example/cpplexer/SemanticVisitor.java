@@ -1,10 +1,9 @@
 package com.example.cpplexer;
 
-import CppSub
 import java.util.HashMap;
 import java.util.Map;
 
-public class SemanticVisitor extends CppSubsetParserVisitor {
+public class SemanticVisitor extends CppSubsetParserBaseVisitor<Integer> {
     Map<String, Integer> memoria = new HashMap<>();
 
     @Override
