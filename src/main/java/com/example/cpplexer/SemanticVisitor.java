@@ -17,8 +17,8 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     protected Deque<Map<String, SymbolTable.Symbol>> scopeStack = new ArrayDeque<>();
 
     public SemanticVisitor() {
-        // Ámbito global inicial
-        pushScope();
+        // Ámbito global inicial — no llamamos pushScope() para evitar override en constructor
+        scopeStack.push(new HashMap<>());
     }
 
     // ─── Gestión de ámbitos ───────────────────────────────────────────────────
@@ -46,8 +46,15 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         return scopeStack.peek().get(name);
     }
 
-    /** Registra un símbolo en el ámbito actual. */
+    /**
+     * Registra un símbolo en el ámbito actual.
+     * Lanza error semántico si el nombre ya existe en ese mismo ámbito
+     * (prevención de redefinición en el mismo scope).
+     */
     protected void defineInCurrentScope(String name, SymbolTable.Symbol sym) {
+        if (lookupCurrentScope(name) != null) {
+            semanticError("Redefinición de '" + name + "' en el mismo ámbito.");
+        }
         scopeStack.peek().put(name, sym);
         System.out.println("  [TS] " + sym);
     }
@@ -157,6 +164,13 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     @Override
     public String visitAssign(CppSubsetParser.AssignContext ctx) {
         String id = ctx.IDENTIFIER().getText();
+
+        // Obligación de declarar: la variable debe existir en algún ámbito
+        SymbolTable.Symbol sym = lookup(id);
+        if (sym == null) {
+            semanticError("Variable '" + id + "' usada sin declarar.");
+        }
+
         String exprType = visit(ctx.expression());
         System.out.println("  Asignación: " + id + " = <" + exprType + ">");
         return exprType;
@@ -196,6 +210,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         SymbolTable.Symbol sym = lookup(name);
         if (sym == null) {
             semanticError("Variable '" + name + "' no declarada.");
+            return null; // inalcanzable; semanticError siempre lanza excepción
         }
         return sym.type;
     }
