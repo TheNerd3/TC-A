@@ -54,6 +54,10 @@ expression
     : expression op=('*'|'/') expression # MulDiv
     | expression op=('+'|'-') expression # AddSub
     | INT_LITERAL                        # Int
+    | DOUBLE_LITERAL                     # Double
+    | CHAR_LITERAL                       # Char
+    | BOOL_LITERAL                       # Bool
+    | STRING_LITERAL                     # StringLit
     | IDENTIFIER                         # Id
     | LPAREN expression RPAREN           # Parens
     ;

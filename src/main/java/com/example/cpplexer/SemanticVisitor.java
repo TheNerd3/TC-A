@@ -6,6 +6,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Visitor semántico con tabla de símbolos por ámbitos (scope stack).
@@ -13,11 +14,14 @@ import java.util.Map;
  */
 public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
+    // Tipos numéricos sobre los que se permiten operaciones aritméticas
+    private static final Set<String> NUMERIC = Set.of("int", "double");
+
     // Pila de ámbitos: tope = ámbito actual, base = ámbito global
     protected Deque<Map<String, SymbolTable.Symbol>> scopeStack = new ArrayDeque<>();
 
     public SemanticVisitor() {
-        // Ámbito global inicial — no llamamos pushScope() para evitar override en constructor
+        // Ámbito global inicial — inline para evitar override call en constructor
         scopeStack.push(new HashMap<>());
     }
 
@@ -33,7 +37,6 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         scopeStack.pop();
     }
 
-    /** Busca un símbolo desde el ámbito más interno hacia el global. */
     protected SymbolTable.Symbol lookup(String name) {
         for (Map<String, SymbolTable.Symbol> scope : scopeStack) {
             if (scope.containsKey(name)) return scope.get(name);
@@ -41,16 +44,10 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         return null;
     }
 
-    /** Busca un símbolo únicamente en el ámbito actual (tope de la pila). */
     protected SymbolTable.Symbol lookupCurrentScope(String name) {
         return scopeStack.peek().get(name);
     }
 
-    /**
-     * Registra un símbolo en el ámbito actual.
-     * Lanza error semántico si el nombre ya existe en ese mismo ámbito
-     * (prevención de redefinición en el mismo scope).
-     */
     protected void defineInCurrentScope(String name, SymbolTable.Symbol sym) {
         if (lookupCurrentScope(name) != null) {
             semanticError("Redefinición de '" + name + "' en el mismo ámbito.");
@@ -79,6 +76,34 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         return types;
     }
 
+    /**
+     * Reglas de compatibilidad de asignación (C++ implícito).
+     * int  <- int      OK
+     * int  <- double   ERROR
+     * double <- int    OK  (widening)
+     * double <- double OK
+     * char <- char     OK
+     * bool <- bool     OK
+     * void <- *        ERROR siempre
+     */
+    private boolean isAssignCompatible(String declared, String expr) {
+        if (declared.equals(expr)) return true;
+        // widening numérico: double puede recibir int
+        if (declared.equals("double") && expr.equals("int")) return true;
+        return false;
+    }
+
+    /**
+     * Tipo resultado de una operación aritmética entre dos operandos.
+     * Retorna null si la combinación no está permitida.
+     */
+    private String arithmeticResultType(String left, String right) {
+        if (!NUMERIC.contains(left) || !NUMERIC.contains(right)) return null;
+        // Si alguno es double el resultado es double
+        if (left.equals("double") || right.equals("double")) return "double";
+        return "int";
+    }
+
     // ─── Program ─────────────────────────────────────────────────────────────
 
     @Override
@@ -89,7 +114,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         return null;
     }
 
-    // ─── Declaraciones globales ───────────────────────────────────────────────
+    // ─── Declaraciones ───────────────────────────────────────────────────────
 
     @Override
     public String visitVariableDecl(CppSubsetParser.VariableDeclContext ctx) {
@@ -98,7 +123,11 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
         SymbolTable.Symbol sym;
         if (ctx.INT_LITERAL() != null) {
+            // Declaración de array: validar tamaño > 0
             int size = Integer.parseInt(ctx.INT_LITERAL().getText());
+            if (size <= 0) {
+                semanticError("El tamaño del array '" + name + "' debe ser mayor a cero (es " + size + ").");
+            }
             sym = new SymbolTable.Symbol(name, type, size);
         } else {
             sym = new SymbolTable.Symbol(name, type);
@@ -112,8 +141,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         String returnType = resolveType(ctx.type());
         String name = ctx.IDENTIFIER().getText();
         List<String> paramTypes = collectParamTypes(ctx.parameterList());
-        SymbolTable.Symbol sym = new SymbolTable.Symbol(name, returnType, paramTypes);
-        defineInCurrentScope(name, sym);
+        defineInCurrentScope(name, new SymbolTable.Symbol(name, returnType, paramTypes));
         return returnType;
     }
 
@@ -123,11 +151,8 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         String name = ctx.IDENTIFIER().getText();
         List<String> paramTypes = collectParamTypes(ctx.parameterList());
 
-        // Registrar la función en el ámbito actual ANTES de abrir el bloque
-        SymbolTable.Symbol sym = new SymbolTable.Symbol(name, returnType, paramTypes);
-        defineInCurrentScope(name, sym);
+        defineInCurrentScope(name, new SymbolTable.Symbol(name, returnType, paramTypes));
 
-        // Abrir ámbito del cuerpo de la función y registrar parámetros
         pushScope();
         if (ctx.parameterList() != null) {
             for (CppSubsetParser.ParameterContext p : ctx.parameterList().parameter()) {
@@ -137,8 +162,6 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             }
         }
 
-        // Visitamos los statements del bloque directamente (sin que visitBlock
-        // abra otro ámbito, porque ya abrimos uno para los parámetros)
         for (CppSubsetParser.StatementContext stmt : ctx.block().statement()) {
             visit(stmt);
         }
@@ -148,8 +171,6 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     }
 
     // ─── Bloque ───────────────────────────────────────────────────────────────
-    // Un bloque { ... } que NO es el cuerpo directo de una función abre su
-    // propio ámbito. Los cuerpos de función ya son manejados en visitFunctionDef.
 
     @Override
     public String visitBlock(CppSubsetParser.BlockContext ctx) {
@@ -165,15 +186,22 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     public String visitAssign(CppSubsetParser.AssignContext ctx) {
         String id = ctx.IDENTIFIER().getText();
 
-        // Obligación de declarar: la variable debe existir en algún ámbito
         SymbolTable.Symbol sym = lookup(id);
         if (sym == null) {
             semanticError("Variable '" + id + "' usada sin declarar.");
+            return null;
         }
 
         String exprType = visit(ctx.expression());
-        System.out.println("  Asignación: " + id + " = <" + exprType + ">");
-        return exprType;
+
+        // Compatibilidad de asignación
+        if (exprType != null && !isAssignCompatible(sym.type, exprType)) {
+            semanticError("Incompatibilidad de tipos en asignación a '" + id +
+                    "': se esperaba <" + sym.type + ">, se obtuvo <" + exprType + ">.");
+        }
+
+        System.out.println("  Asignación OK: " + sym.type + " " + id + " = <" + exprType + ">");
+        return sym.type;
     }
 
     @Override
@@ -189,14 +217,24 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     public String visitMulDiv(CppSubsetParser.MulDivContext ctx) {
         String left = visit(ctx.expression(0));
         String right = visit(ctx.expression(1));
-        return left != null ? left : right;
+        String result = arithmeticResultType(left, right);
+        if (result == null) {
+            semanticError("Operador '" + ctx.op.getText() + "' no aplicable entre <" +
+                    left + "> y <" + right + ">.");
+        }
+        return result;
     }
 
     @Override
     public String visitAddSub(CppSubsetParser.AddSubContext ctx) {
         String left = visit(ctx.expression(0));
         String right = visit(ctx.expression(1));
-        return left != null ? left : right;
+        String result = arithmeticResultType(left, right);
+        if (result == null) {
+            semanticError("Operador '" + ctx.op.getText() + "' no aplicable entre <" +
+                    left + "> y <" + right + ">.");
+        }
+        return result;
     }
 
     @Override
@@ -205,12 +243,32 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     }
 
     @Override
+    public String visitDouble(CppSubsetParser.DoubleContext ctx) {
+        return "double";
+    }
+
+    @Override
+    public String visitChar(CppSubsetParser.CharContext ctx) {
+        return "char";
+    }
+
+    @Override
+    public String visitBool(CppSubsetParser.BoolContext ctx) {
+        return "bool";
+    }
+
+    @Override
+    public String visitStringLit(CppSubsetParser.StringLitContext ctx) {
+        return "string";
+    }
+
+    @Override
     public String visitId(CppSubsetParser.IdContext ctx) {
         String name = ctx.IDENTIFIER().getText();
         SymbolTable.Symbol sym = lookup(name);
         if (sym == null) {
             semanticError("Variable '" + name + "' no declarada.");
-            return null; // inalcanzable; semanticError siempre lanza excepción
+            return null;
         }
         return sym.type;
     }
