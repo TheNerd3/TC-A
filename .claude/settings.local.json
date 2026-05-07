@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(mvn -q clean package -DskipTests)",
+      "PowerShell($env:PATH -split \";\" | Where-Object { $_ -match \"maven|mvn\" -or \\(Test-Path \"$_\\\\mvn.cmd\" -ErrorAction SilentlyContinue\\) })",
+      "PowerShell($java = \"C:\\\\Program Files\\\\Eclipse Adoptium\\\\jdk-21.0.10.7-hotspot\\\\bin\\\\java.exe\"; & $java -version 2>&1)"
+    ]
+  }
+}
+
