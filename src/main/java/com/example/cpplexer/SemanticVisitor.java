@@ -1,17 +1,56 @@
 package com.example.cpplexer;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Visitor semántico. Devuelve String con el tipo resultante de cada nodo.
+ * Visitor semántico con tabla de símbolos por ámbitos (scope stack).
+ * Devuelve String con el tipo resultante de cada expresión/nodo.
  */
 public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
-    // Tabla de símbolos global: nombre -> Symbol
-    protected Map<String, SymbolTable.Symbol> symbolTable = new HashMap<>();
+    // Pila de ámbitos: tope = ámbito actual, base = ámbito global
+    protected Deque<Map<String, SymbolTable.Symbol>> scopeStack = new ArrayDeque<>();
+
+    public SemanticVisitor() {
+        // Ámbito global inicial
+        pushScope();
+    }
+
+    // ─── Gestión de ámbitos ───────────────────────────────────────────────────
+
+    protected void pushScope() {
+        scopeStack.push(new HashMap<>());
+        System.out.println("  [SCOPE] Entrar ámbito (nivel " + scopeStack.size() + ")");
+    }
+
+    protected void popScope() {
+        System.out.println("  [SCOPE] Salir ámbito (nivel " + scopeStack.size() + ")");
+        scopeStack.pop();
+    }
+
+    /** Busca un símbolo desde el ámbito más interno hacia el global. */
+    protected SymbolTable.Symbol lookup(String name) {
+        for (Map<String, SymbolTable.Symbol> scope : scopeStack) {
+            if (scope.containsKey(name)) return scope.get(name);
+        }
+        return null;
+    }
+
+    /** Busca un símbolo únicamente en el ámbito actual (tope de la pila). */
+    protected SymbolTable.Symbol lookupCurrentScope(String name) {
+        return scopeStack.peek().get(name);
+    }
+
+    /** Registra un símbolo en el ámbito actual. */
+    protected void defineInCurrentScope(String name, SymbolTable.Symbol sym) {
+        scopeStack.peek().put(name, sym);
+        System.out.println("  [TS] " + sym);
+    }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -23,30 +62,23 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         return ctx.getText();
     }
 
-    protected void registerVariable(String name, String type) {
-        symbolTable.put(name, new SymbolTable.Symbol(name, type));
-        System.out.println("  [TS] Registrada variable: " + type + " " + name);
-    }
-
-    protected void registerArray(String name, String type, int size) {
-        symbolTable.put(name, new SymbolTable.Symbol(name, type, size));
-        System.out.println("  [TS] Registrado array: " + type + " " + name + "[" + size + "]");
-    }
-
-    protected void registerFunction(String name, String returnType, List<String> paramTypes) {
-        symbolTable.put(name, new SymbolTable.Symbol(name, returnType, paramTypes));
-        System.out.println("  [TS] Registrada función: " + returnType + " " + name +
-                "(" + String.join(", ", paramTypes) + ")");
+    protected List<String> collectParamTypes(CppSubsetParser.ParameterListContext ctx) {
+        List<String> types = new ArrayList<>();
+        if (ctx != null) {
+            for (CppSubsetParser.ParameterContext p : ctx.parameter()) {
+                types.add(resolveType(p.type()));
+            }
+        }
+        return types;
     }
 
     // ─── Program ─────────────────────────────────────────────────────────────
 
     @Override
     public String visitProgram(CppSubsetParser.ProgramContext ctx) {
-        System.out.println("--- Tabla de Símbolos ---");
+        System.out.println("--- Iniciando análisis semántico ---");
         visitChildren(ctx);
-        System.out.println("--- Símbolos registrados: " + symbolTable.size() + " ---");
-        symbolTable.values().forEach(s -> System.out.println("  " + s));
+        System.out.println("--- Análisis semántico completado ---");
         return null;
     }
 
@@ -57,13 +89,14 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         String type = resolveType(ctx.type());
         String name = ctx.IDENTIFIER().getText();
 
+        SymbolTable.Symbol sym;
         if (ctx.INT_LITERAL() != null) {
-            // Declaración de array
             int size = Integer.parseInt(ctx.INT_LITERAL().getText());
-            registerArray(name, type, size);
+            sym = new SymbolTable.Symbol(name, type, size);
         } else {
-            registerVariable(name, type);
+            sym = new SymbolTable.Symbol(name, type);
         }
+        defineInCurrentScope(name, sym);
         return type;
     }
 
@@ -72,7 +105,8 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         String returnType = resolveType(ctx.type());
         String name = ctx.IDENTIFIER().getText();
         List<String> paramTypes = collectParamTypes(ctx.parameterList());
-        registerFunction(name, returnType, paramTypes);
+        SymbolTable.Symbol sym = new SymbolTable.Symbol(name, returnType, paramTypes);
+        defineInCurrentScope(name, sym);
         return returnType;
     }
 
@@ -81,9 +115,41 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         String returnType = resolveType(ctx.type());
         String name = ctx.IDENTIFIER().getText();
         List<String> paramTypes = collectParamTypes(ctx.parameterList());
-        registerFunction(name, returnType, paramTypes);
-        visitChildren(ctx);
+
+        // Registrar la función en el ámbito actual ANTES de abrir el bloque
+        SymbolTable.Symbol sym = new SymbolTable.Symbol(name, returnType, paramTypes);
+        defineInCurrentScope(name, sym);
+
+        // Abrir ámbito del cuerpo de la función y registrar parámetros
+        pushScope();
+        if (ctx.parameterList() != null) {
+            for (CppSubsetParser.ParameterContext p : ctx.parameterList().parameter()) {
+                String pType = resolveType(p.type());
+                String pName = p.IDENTIFIER().getText();
+                defineInCurrentScope(pName, new SymbolTable.Symbol(pName, pType));
+            }
+        }
+
+        // Visitamos los statements del bloque directamente (sin que visitBlock
+        // abra otro ámbito, porque ya abrimos uno para los parámetros)
+        for (CppSubsetParser.StatementContext stmt : ctx.block().statement()) {
+            visit(stmt);
+        }
+
+        popScope();
         return returnType;
+    }
+
+    // ─── Bloque ───────────────────────────────────────────────────────────────
+    // Un bloque { ... } que NO es el cuerpo directo de una función abre su
+    // propio ámbito. Los cuerpos de función ya son manejados en visitFunctionDef.
+
+    @Override
+    public String visitBlock(CppSubsetParser.BlockContext ctx) {
+        pushScope();
+        visitChildren(ctx);
+        popScope();
+        return null;
     }
 
     // ─── Statements ──────────────────────────────────────────────────────────
@@ -127,7 +193,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     @Override
     public String visitId(CppSubsetParser.IdContext ctx) {
         String name = ctx.IDENTIFIER().getText();
-        SymbolTable.Symbol sym = symbolTable.get(name);
+        SymbolTable.Symbol sym = lookup(name);
         if (sym == null) {
             semanticError("Variable '" + name + "' no declarada.");
         }
@@ -137,17 +203,5 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     @Override
     public String visitParens(CppSubsetParser.ParensContext ctx) {
         return visit(ctx.expression());
-    }
-
-    // ─── Utilidades ──────────────────────────────────────────────────────────
-
-    protected List<String> collectParamTypes(CppSubsetParser.ParameterListContext ctx) {
-        List<String> types = new ArrayList<>();
-        if (ctx != null) {
-            for (CppSubsetParser.ParameterContext p : ctx.parameter()) {
-                types.add(resolveType(p.type()));
-            }
-        }
-        return types;
     }
 }
