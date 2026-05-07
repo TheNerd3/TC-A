@@ -25,7 +25,9 @@ public class LexerMain {
         String path = args[0];
 
         try {
+            // ---------------------------------------------------------
             // 1. ANÁLISIS LÉXICO
+            // ---------------------------------------------------------
             CharStream input = CharStreams.fromFileName(path);
             CppSubsetLexer lexer = new CppSubsetLexer(input);
 
@@ -33,8 +35,6 @@ public class LexerMain {
             LexerErrorListener lexErrors = new LexerErrorListener();
             lexer.addErrorListener(lexErrors);
 
-            // En lugar de getAllTokens() (que vacía el lexer), usamos CommonTokenStream
-            // Esto nos permite imprimir la tabla Y LUEGO usar el parser con los mismos tokens.
             CommonTokenStream tokens = new CommonTokenStream(lexer);
             tokens.fill(); // Lee todos los tokens en memoria
 
@@ -78,15 +78,15 @@ public class LexerMain {
                             ANSI_RED, e.getLine(), e.getCol(), ANSI_RESET, e.getLexeme());
                 }
                 System.out.printf("%sResumen: %d error(es) léxico(s)%s%n", ANSI_RED, errors.size(), ANSI_RESET);
-                System.exit(2);
+                System.exit(2); // Código de salida 2 para errores léxicos
             } else {
                 System.out.println();
                 System.out.println(color(ANSI_GREEN, "Análisis léxico completado correctamente. Sin errores léxicos."));
 
                 // ---------------------------------------------------------
-                // 2. ANÁLISIS SINTÁCTICO Y SEMÁNTICO
+                // 2. ANÁLISIS SINTÁCTICO
                 // ---------------------------------------------------------
-                System.out.println("\n" + color(ANSI_YELLOW, "--- Iniciando Análisis Sintáctico y Semántico ---"));
+                System.out.println("\n" + color(ANSI_YELLOW, "--- Iniciando Análisis Sintáctico ---"));
 
                 // Reiniciamos el puntero de los tokens a 0 para que el parser los lea desde el principio
                 tokens.seek(0);
@@ -94,10 +94,36 @@ public class LexerMain {
                 CppSubsetParser parser = new CppSubsetParser(tokens);
                 ParseTree tree = parser.program(); // Empezamos a leer desde la regla raíz (program)
 
-                // Ejecutamos nuestro Visitor Semántico
-                System.out.println("--- Resultados de ejecución en memoria ---");
-                SemanticVisitor visitor = new SemanticVisitor();
-                visitor.visit(tree);
+                // Defensa del compilador: Abortar si hay errores sintácticos
+                if (parser.getNumberOfSyntaxErrors() > 0) {
+                    System.err.println(color(ANSI_RED, "\nSe encontraron errores SINTÁCTICOS en el código."));
+                    System.err.println(color(ANSI_RED, "No se puede pasar al análisis semántico con un árbol roto."));
+                    System.exit(1);
+                }
+
+                System.out.println("\n" + color(ANSI_GREEN, "Análisis Sintáctico completado (AST generado con éxito)."));
+
+                // ---------------------------------------------------------
+                // 3. ANÁLISIS SEMÁNTICO
+                // ---------------------------------------------------------
+                System.out.println("\n" + color(ANSI_YELLOW, "--- Iniciando Análisis Semántico ---"));
+
+                try {
+                    // Instanciamos y ejecutamos nuestro Visitor
+                    SemanticVisitor visitor = new SemanticVisitor();
+                    visitor.visit(tree);
+
+                    // Si llegamos a esta línea sin que lance excepciones, el código es 100% válido
+                    System.out.println("\n" + color(ANSI_GREEN, "Análisis Semántico completado. ¡El código es semánticamente correcto!"));
+
+                } catch (RuntimeException e) {
+                    // ATRAPAMOS EL ERROR: En lugar de un pantallazo rojo de Java,
+                    // mostramos el error semántico limpio y abortamos la compilación.
+                    System.out.println();
+                    System.err.println(color(ANSI_RED, "■ " + e.getMessage()));
+                    System.err.println(color(ANSI_RED, "■ La compilación ha sido abortada debido a violaciones semánticas."));
+                    System.exit(3); // Código de salida 3 para errores semánticos
+                }
             }
 
         } catch (IOException e) {
