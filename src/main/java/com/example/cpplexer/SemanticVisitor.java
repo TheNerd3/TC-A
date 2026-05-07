@@ -1,80 +1,153 @@
 package com.example.cpplexer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-public class SemanticVisitor extends CppSubsetParserBaseVisitor<Integer> {
+/**
+ * Visitor semántico. Devuelve String con el tipo resultante de cada nodo.
+ */
+public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
-    // Memoria para guardar variables
-    Map<String, Integer> memoria = new HashMap<>();
+    // Tabla de símbolos global: nombre -> Symbol
+    protected Map<String, SymbolTable.Symbol> symbolTable = new HashMap<>();
 
-    @Override
-    public Integer visitAssign(CppSubsetParser.AssignContext ctx) {
-        String id = ctx.IDENTIFIER().getText();
-        Integer value = visit(ctx.expression());
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
-        if (value != null) {
-            memoria.put(id, value);
-            System.out.println("Semántico -> Se asignó '" + id + "' con valor: " + value);
-        }
-        return value;
+    protected void semanticError(String msg) {
+        throw new RuntimeException("ERROR SEMANTICO: " + msg);
     }
 
-    @Override
-    public Integer visitPrintExpr(CppSubsetParser.PrintExprContext ctx) {
-        Integer value = visit(ctx.expression());
-        System.out.println("Semántico -> Resultado de la expresión: " + value);
-        return value;
+    protected String resolveType(CppSubsetParser.TypeContext ctx) {
+        return ctx.getText();
     }
 
+    protected void registerVariable(String name, String type) {
+        symbolTable.put(name, new SymbolTable.Symbol(name, type));
+        System.out.println("  [TS] Registrada variable: " + type + " " + name);
+    }
+
+    protected void registerArray(String name, String type, int size) {
+        symbolTable.put(name, new SymbolTable.Symbol(name, type, size));
+        System.out.println("  [TS] Registrado array: " + type + " " + name + "[" + size + "]");
+    }
+
+    protected void registerFunction(String name, String returnType, List<String> paramTypes) {
+        symbolTable.put(name, new SymbolTable.Symbol(name, returnType, paramTypes));
+        System.out.println("  [TS] Registrada función: " + returnType + " " + name +
+                "(" + String.join(", ", paramTypes) + ")");
+    }
+
+    // ─── Program ─────────────────────────────────────────────────────────────
+
     @Override
-    public Integer visitAddSub(CppSubsetParser.AddSubContext ctx) {
-        // Usamos Integer en vez de int por seguridad
-        Integer left = visit(ctx.expression(0));
-        Integer right = visit(ctx.expression(1));
+    public String visitProgram(CppSubsetParser.ProgramContext ctx) {
+        System.out.println("--- Tabla de Símbolos ---");
+        visitChildren(ctx);
+        System.out.println("--- Símbolos registrados: " + symbolTable.size() + " ---");
+        symbolTable.values().forEach(s -> System.out.println("  " + s));
+        return null;
+    }
 
-        if (left == null || right == null) return null; // Protección contra errores de sintaxis
+    // ─── Declaraciones globales ───────────────────────────────────────────────
 
-        if (ctx.op.getText().equals("+")){
-            return left + right;
+    @Override
+    public String visitVariableDecl(CppSubsetParser.VariableDeclContext ctx) {
+        String type = resolveType(ctx.type());
+        String name = ctx.IDENTIFIER().getText();
+
+        if (ctx.INT_LITERAL() != null) {
+            // Declaración de array
+            int size = Integer.parseInt(ctx.INT_LITERAL().getText());
+            registerArray(name, type, size);
         } else {
-            return left - right;
+            registerVariable(name, type);
         }
+        return type;
     }
 
     @Override
-    public Integer visitMulDiv(CppSubsetParser.MulDivContext ctx) {
-        Integer left = visit(ctx.expression(0));
-        Integer right = visit(ctx.expression(1));
-
-        if (left == null || right == null) return null; // Protección
-
-        if (ctx.op.getText().equals("*")) {
-            return left * right;
-        } else {
-            if (right == 0) {
-                throw new ArithmeticException("ERROR SEMANTICO: ¡Division por cero detectada!");
-            }
-            return left / right;
-        }
+    public String visitFunctionDecl(CppSubsetParser.FunctionDeclContext ctx) {
+        String returnType = resolveType(ctx.type());
+        String name = ctx.IDENTIFIER().getText();
+        List<String> paramTypes = collectParamTypes(ctx.parameterList());
+        registerFunction(name, returnType, paramTypes);
+        return returnType;
     }
 
     @Override
-    public Integer visitInt(CppSubsetParser.IntContext ctx) {
-        return Integer.valueOf(ctx.INT_LITERAL().getText());
+    public String visitFunctionDef(CppSubsetParser.FunctionDefContext ctx) {
+        String returnType = resolveType(ctx.type());
+        String name = ctx.IDENTIFIER().getText();
+        List<String> paramTypes = collectParamTypes(ctx.parameterList());
+        registerFunction(name, returnType, paramTypes);
+        visitChildren(ctx);
+        return returnType;
     }
 
+    // ─── Statements ──────────────────────────────────────────────────────────
+
     @Override
-    public Integer visitId(CppSubsetParser.IdContext ctx) {
+    public String visitAssign(CppSubsetParser.AssignContext ctx) {
         String id = ctx.IDENTIFIER().getText();
-        if (memoria.containsKey(id)) {
-            return memoria.get(id);
-        }
-        throw new RuntimeException("ERROR SEMANTICO: Variable '" + id + "' no inicializada.");
+        String exprType = visit(ctx.expression());
+        System.out.println("  Asignación: " + id + " = <" + exprType + ">");
+        return exprType;
     }
 
     @Override
-    public Integer visitParens(CppSubsetParser.ParensContext ctx) {
+    public String visitPrintExpr(CppSubsetParser.PrintExprContext ctx) {
+        String type = visit(ctx.expression());
+        System.out.println("  Expresión de tipo: <" + type + ">");
+        return type;
+    }
+
+    // ─── Expresiones ─────────────────────────────────────────────────────────
+
+    @Override
+    public String visitMulDiv(CppSubsetParser.MulDivContext ctx) {
+        String left = visit(ctx.expression(0));
+        String right = visit(ctx.expression(1));
+        return left != null ? left : right;
+    }
+
+    @Override
+    public String visitAddSub(CppSubsetParser.AddSubContext ctx) {
+        String left = visit(ctx.expression(0));
+        String right = visit(ctx.expression(1));
+        return left != null ? left : right;
+    }
+
+    @Override
+    public String visitInt(CppSubsetParser.IntContext ctx) {
+        return "int";
+    }
+
+    @Override
+    public String visitId(CppSubsetParser.IdContext ctx) {
+        String name = ctx.IDENTIFIER().getText();
+        SymbolTable.Symbol sym = symbolTable.get(name);
+        if (sym == null) {
+            semanticError("Variable '" + name + "' no declarada.");
+        }
+        return sym.type;
+    }
+
+    @Override
+    public String visitParens(CppSubsetParser.ParensContext ctx) {
         return visit(ctx.expression());
+    }
+
+    // ─── Utilidades ──────────────────────────────────────────────────────────
+
+    protected List<String> collectParamTypes(CppSubsetParser.ParameterListContext ctx) {
+        List<String> types = new ArrayList<>();
+        if (ctx != null) {
+            for (CppSubsetParser.ParameterContext p : ctx.parameter()) {
+                types.add(resolveType(p.type()));
+            }
+        }
+        return types;
     }
 }
