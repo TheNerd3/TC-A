@@ -20,6 +20,9 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     // Pila de ámbitos: tope = ámbito actual, base = ámbito global
     protected Deque<Map<String, SymbolTable.Symbol>> scopeStack = new ArrayDeque<>();
 
+    // Tipo de retorno de la función que se está analizando actualmente
+    protected String currentFunctionReturnType = null;
+
     public SemanticVisitor() {
         // Ámbito global inicial — inline para evitar override call en constructor
         scopeStack.push(new HashMap<>());
@@ -153,6 +156,10 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
         defineInCurrentScope(name, new SymbolTable.Symbol(name, returnType, paramTypes));
 
+        // Guardar y restaurar el tipo de retorno para soportar funciones anidadas
+        String previousReturnType = currentFunctionReturnType;
+        currentFunctionReturnType = returnType;
+
         pushScope();
         if (ctx.parameterList() != null) {
             for (CppSubsetParser.ParameterContext p : ctx.parameterList().parameter()) {
@@ -167,6 +174,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         }
 
         popScope();
+        currentFunctionReturnType = previousReturnType;
         return returnType;
     }
 
@@ -276,5 +284,83 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     @Override
     public String visitParens(CppSubsetParser.ParensContext ctx) {
         return visit(ctx.expression());
+    }
+
+    // ─── Return ───────────────────────────────────────────────────────────────
+
+    @Override
+    public String visitReturnExpr(CppSubsetParser.ReturnExprContext ctx) {
+        if (currentFunctionReturnType == null) {
+            semanticError("'return' con valor fuera de una función.");
+            return null;
+        }
+        if (currentFunctionReturnType.equals("void")) {
+            semanticError("Función void no puede retornar un valor.");
+        }
+        String exprType = visit(ctx.expression());
+        if (!isAssignCompatible(currentFunctionReturnType, exprType)) {
+            semanticError("Tipo de retorno incompatible: función declara <" +
+                    currentFunctionReturnType + ">, se retorna <" + exprType + ">.");
+        }
+        System.out.println("  return OK: <" + exprType + "> en función <" + currentFunctionReturnType + ">");
+        return exprType;
+    }
+
+    @Override
+    public String visitReturnVoid(CppSubsetParser.ReturnVoidContext ctx) {
+        if (currentFunctionReturnType == null) {
+            semanticError("'return' fuera de una función.");
+            return null;
+        }
+        if (!currentFunctionReturnType.equals("void")) {
+            semanticError("Función <" + currentFunctionReturnType +
+                    "> debe retornar un valor, no un return vacío.");
+        }
+        System.out.println("  return void OK");
+        return "void";
+    }
+
+    // ─── Llamada a función ────────────────────────────────────────────────────
+
+    @Override
+    public String visitFuncCall(CppSubsetParser.FuncCallContext ctx) {
+        String name = ctx.IDENTIFIER().getText();
+        SymbolTable.Symbol sym = lookup(name);
+        if (sym == null) {
+            semanticError("Función '" + name + "' no declarada.");
+            return null;
+        }
+        if (sym.kind != SymbolTable.Kind.FUNCTION) {
+            semanticError("'" + name + "' no es una función.");
+            return null;
+        }
+
+        // Recolectar tipos de argumentos pasados
+        List<String> argTypes = new ArrayList<>();
+        if (ctx.argumentList() != null) {
+            for (CppSubsetParser.ExpressionContext arg : ctx.argumentList().expression()) {
+                argTypes.add(visit(arg));
+            }
+        }
+
+        List<String> expected = sym.paramTypes;
+
+        // Verificar cantidad de argumentos
+        if (argTypes.size() != expected.size()) {
+            semanticError("Llamada a '" + name + "': se esperaban " + expected.size() +
+                    " argumento(s), se pasaron " + argTypes.size() + ".");
+        }
+
+        // Verificar tipos de argumentos en orden
+        for (int i = 0; i < expected.size(); i++) {
+            if (!isAssignCompatible(expected.get(i), argTypes.get(i))) {
+                semanticError("Argumento " + (i + 1) + " de '" + name +
+                        "': se esperaba <" + expected.get(i) + ">, se obtuvo <" + argTypes.get(i) + ">.");
+            }
+        }
+
+        System.out.println("  Llamada OK: " + name + "(" + String.join(", ", argTypes) +
+                ") -> <" + sym.type + ">");
+        return sym.type;
     }
 }
