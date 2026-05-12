@@ -29,16 +29,23 @@ parameter
     ;
 
 variableDecl
-    : type IDENTIFIER SEMI
-    | type IDENTIFIER LBRACK INT_LITERAL RBRACK SEMI
+    : type IDENTIFIER (ASSIGN expression)? SEMI
+    | type IDENTIFIER LBRACK INT_LITERAL RBRACK (ASSIGN expression)? SEMI
+    ;
+
+// variant without trailing semicolon (useful for for-loop init)
+variableDeclNoSemi
+    : type IDENTIFIER (ASSIGN expression)?
+    | type IDENTIFIER LBRACK INT_LITERAL RBRACK (ASSIGN expression)?
     ;
 
 type
-    : 'int'
-    | 'double'
-    | 'char'
-    | 'bool'
-    | 'void'
+    : INT
+    | DOUBLE
+    | CHAR
+    | BOOL
+    | VOID
+    | DATE
     ;
 
 block
@@ -46,23 +53,107 @@ block
     ;
 
 statement
-    : IDENTIFIER '=' expression SEMI               # Assign
-    | RETURN expression SEMI                       # ReturnExpr
-    | RETURN SEMI                                  # ReturnVoid
-    | expression SEMI                              # PrintExpr
+// Statements
+statement
+    : variableDecl
+    | block
+    | SEMI
+    | RETURN expression? SEMI
+    | ifStatement
+    | whileStatement
+    | forStatement
+    | breakStatement
+    | continueStatement
+    | expressionStatement
+    ;
+
+ifStatement
+    : IF LPAREN expression RPAREN statement (ELSE statement)?
+    ;
+
+whileStatement
+    : WHILE LPAREN expression RPAREN statement
+    ;
+
+forStatement
+    : FOR LPAREN forInit? SEMI expression? SEMI forUpdate? RPAREN statement
+    ;
+
+forInit
+    : variableDeclNoSemi
+    | expression
+    ;
+
+forUpdate
+    : expression (COMMA expression)*
+    ;
+
+breakStatement
+    : BREAK SEMI
+    ;
+
+continueStatement
+    : CONTINUE SEMI
+    ;
+
+expressionStatement
+    : expression? SEMI
+    ;
     ;
 
 expression
-    : expression op=('*'|'/') expression                        # MulDiv
-    | expression op=('+'|'-') expression                        # AddSub
-    | IDENTIFIER LPAREN argumentList? RPAREN                    # FuncCall
-    | INT_LITERAL                                               # Int
-    | DOUBLE_LITERAL                                            # Double
-    | CHAR_LITERAL                                              # Char
-    | BOOL_LITERAL                                              # Bool
-    | STRING_LITERAL                                            # StringLit
-    | IDENTIFIER                                                # Id
-    | LPAREN expression RPAREN                                  # Parens
+// Expressions with precedence
+expression
+    : assignmentExpression
+    ;
+
+assignmentExpression
+    : logicalOrExpression (ASSIGN assignmentExpression)?
+    ;
+
+logicalOrExpression
+    : logicalAndExpression ( OROR logicalAndExpression )*
+    ;
+
+logicalAndExpression
+    : equalityExpression ( ANDAND equalityExpression )*
+    ;
+
+equalityExpression
+    : relationalExpression ( (EQEQ | NEQ) relationalExpression )*
+    ;
+
+relationalExpression
+    : additiveExpression ( (LT | LE | GT | GE) additiveExpression )*
+    ;
+
+additiveExpression
+    : multiplicativeExpression ( (PLUS | MINUS) multiplicativeExpression )*
+    ;
+
+multiplicativeExpression
+    : unaryExpression ( (STAR | DIV | MOD) unaryExpression )*
+    ;
+
+unaryExpression
+    : (PLUS | MINUS | NOT)? postfixExpression
+    ;
+
+postfixExpression
+    : primary ( PLUSPLUS | MINUSMINUS )?
+    ;
+
+primary
+    : IDENTIFIER
+    | INT_LITERAL
+    | DOUBLE_LITERAL
+    | FLOAT_LITERAL
+    | STRING_LITERAL
+    | CHAR_LITERAL
+    | DATE_LITERAL
+    | BOOL_LITERAL
+    | LPAREN expression RPAREN
+    ;
     ;
 
 argumentList

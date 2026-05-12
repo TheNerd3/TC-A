@@ -1,4 +1,4 @@
-// Generated from c:/Users/solch/OneDrive/Desktop/UNI/TC-A/src/main/antlr4/com/example/cpplexer/CppSubsetLexer.g4 by ANTLR 4.13.1
+// Generated from c:/Users/marti/OneDrive/Desktop/FACU/QUINTO/TC/FINAL/TC-A/src/main/antlr4/com/example/cpplexer/CppSubsetLexer.g4 by ANTLR 4.13.1
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.Token;
