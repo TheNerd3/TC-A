@@ -18,15 +18,9 @@ BREAK: 'break';
 CONTINUE: 'continue';
 RETURN: 'return';
 
-fragment YEAR : [0-9];
-fragment MONTH
-    : '0' [1-9]
-    | '1' [0-2];
-fragment DAY
-    : '0' [1-9]
-    | [12] [0-9]
-    | '3' [01]
-    ;
+fragment YEAR : [0-9]+;
+fragment MONTH : [0-9]+;
+fragment DAY : [0-9]+;
 
 // Multi-character operators
 EQEQ: '==';

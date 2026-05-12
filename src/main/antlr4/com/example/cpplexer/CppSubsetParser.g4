@@ -52,19 +52,20 @@ block
     : LBRACE statement* RBRACE
     ;
 
-statement
 // Statements
 statement
-    : variableDecl
-    | block
-    | SEMI
-    | RETURN expression? SEMI
-    | ifStatement
-    | whileStatement
-    | forStatement
-    | breakStatement
-    | continueStatement
-    | expressionStatement
+    : IDENTIFIER ASSIGN expression SEMI                                     # Assign
+    | RETURN expression SEMI                                                # ReturnExpr
+    | RETURN SEMI                                                           # ReturnVoid
+    | expression SEMI                                                       # PrintExpr
+    | variableDecl                                                          # VarDeclStmt
+    | block                                                                 # BlockStmt
+    | FOR LPAREN forInit? SEMI expression? SEMI forUpdate? RPAREN statement # ForStmt
+    | SEMI                                                                  # EmptyStmt
+    | ifStatement                                                           # IfStmt
+    | whileStatement                                                        # WhileStmt
+    | breakStatement                                                        # BreakStmt
+    | continueStatement                                                     # ContinueStmt
     ;
 
 ifStatement
@@ -96,64 +97,23 @@ continueStatement
     : CONTINUE SEMI
     ;
 
-expressionStatement
-    : expression? SEMI
-    ;
-    ;
-
-expression
 // Expressions with precedence
 expression
-    : assignmentExpression
-    ;
-
-assignmentExpression
-    : logicalOrExpression (ASSIGN assignmentExpression)?
-    ;
-
-logicalOrExpression
-    : logicalAndExpression ( OROR logicalAndExpression )*
-    ;
-
-logicalAndExpression
-    : equalityExpression ( ANDAND equalityExpression )*
-    ;
-
-equalityExpression
-    : relationalExpression ( (EQEQ | NEQ) relationalExpression )*
-    ;
-
-relationalExpression
-    : additiveExpression ( (LT | LE | GT | GE) additiveExpression )*
-    ;
-
-additiveExpression
-    : multiplicativeExpression ( (PLUS | MINUS) multiplicativeExpression )*
-    ;
-
-multiplicativeExpression
-    : unaryExpression ( (STAR | DIV | MOD) unaryExpression )*
-    ;
-
-unaryExpression
-    : (PLUS | MINUS | NOT)? postfixExpression
-    ;
-
-postfixExpression
-    : primary ( PLUSPLUS | MINUSMINUS )?
-    ;
-
-primary
-    : IDENTIFIER
-    | INT_LITERAL
-    | DOUBLE_LITERAL
-    | FLOAT_LITERAL
-    | STRING_LITERAL
-    | CHAR_LITERAL
-    | DATE_LITERAL
-    | BOOL_LITERAL
-    | LPAREN expression RPAREN
-    ;
+    : expression op=(STAR|DIV|MOD) expression                   # MulDiv
+    | expression op=(PLUS|MINUS) expression                     # AddSub
+    | expression op=(LT|LE|GT|GE|EQEQ|NEQ) expression           # Relational
+    | expression op=(ANDAND|OROR) expression                    # Logical
+    | IDENTIFIER (PLUSPLUS | MINUSMINUS)                        # PostIncDec
+    | IDENTIFIER LPAREN argumentList? RPAREN                    # FuncCall
+    | INT_LITERAL                                               # Int
+    | DOUBLE_LITERAL                                            # Double
+    | FLOAT_LITERAL                                             # Float
+    | CHAR_LITERAL                                              # Char
+    | BOOL_LITERAL                                              # Bool
+    | STRING_LITERAL                                            # StringLit
+    | DATE_LITERAL                                              # DateLit
+    | IDENTIFIER                                                # Id
+    | LPAREN expression RPAREN                                  # Parens
     ;
 
 argumentList

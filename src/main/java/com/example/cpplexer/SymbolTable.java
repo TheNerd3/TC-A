@@ -1,63 +1,45 @@
 package com.example.cpplexer;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Stack;
 
-/**
- * Entrada de la tabla de símbolos.
- * Guarda metadatos de variables y funciones, no valores de ejecución.
- */
 public class SymbolTable {
+    // Una pila de diccionarios. Cada llave '{' crea un diccionario nuevo.
+    private Stack<Map<String, Object>> scopes;
 
-    public enum Kind { VARIABLE, ARRAY, FUNCTION }
+    public SymbolTable() {
+        scopes = new Stack<>();
+        enterScope(); // Creamos el ámbito Global al iniciar
+    }
 
-    public static class Symbol {
-        public final String name;
-        public final String type;       // "int", "double", "char", "bool", "void"
-        public final Kind kind;
+    // Entrar a una función o bloque {
+    public void enterScope() {
+        scopes.push(new HashMap<>());
+    }
 
-        // Solo para arrays
-        public final int arraySize;
-
-        // Solo para funciones
-        public final List<String> paramTypes; // tipos de parámetros en orden
-
-        /** Constructor para variable simple */
-        public Symbol(String name, String type) {
-            this.name = name;
-            this.type = type;
-            this.kind = Kind.VARIABLE;
-            this.arraySize = -1;
-            this.paramTypes = null;
+    // Salir de una función o bloque }
+    public void exitScope() {
+        if (scopes.size() > 1) {
+            scopes.pop();
         }
+    }
 
-        /** Constructor para array */
-        public Symbol(String name, String type, int arraySize) {
-            this.name = name;
-            this.type = type;
-            this.kind = Kind.ARRAY;
-            this.arraySize = arraySize;
-            this.paramTypes = null;
+    // Guardar una nueva variable
+    public void define(String name, Object value) {
+        if (scopes.peek().containsKey(name)) {
+            throw new RuntimeException("ERROR SEMÁNTICO: La variable '" + name + "' ya fue declarada en este bloque.");
         }
+        scopes.peek().put(name, value);
+    }
 
-        /** Constructor para función (declaración o definición) */
-        public Symbol(String name, String returnType, List<String> paramTypes) {
-            this.name = name;
-            this.type = returnType;
-            this.kind = Kind.FUNCTION;
-            this.arraySize = -1;
-            this.paramTypes = new ArrayList<>(paramTypes);
-        }
-
-        @Override
-        public String toString() {
-            if (kind == Kind.FUNCTION) {
-                return "FUNC " + type + " " + name + "(" + String.join(", ", paramTypes) + ")";
-            } else if (kind == Kind.ARRAY) {
-                return "ARRAY " + type + " " + name + "[" + arraySize + "]";
-            } else {
-                return "VAR " + type + " " + name;
+    // Buscar el valor de una variable (desde el bloque local hasta el global)
+    public Object resolve(String name) {
+        for (int i = scopes.size() - 1; i >= 0; i--) {
+            if (scopes.get(i).containsKey(name)) {
+                return scopes.get(i).get(name);
             }
         }
+        throw new RuntimeException("ERROR SEMÁNTICO: La variable '" + name + "' no está declarada.");
     }
 }

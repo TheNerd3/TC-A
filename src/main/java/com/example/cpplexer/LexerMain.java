@@ -103,6 +103,9 @@ public class LexerMain {
 
                 System.out.println("\n" + color(ANSI_GREEN, "Análisis Sintáctico completado (AST generado con éxito)."));
 
+                System.out.println(color(ANSI_YELLOW, "Estructura del AST:"));
+                System.out.println(tree.toStringTree(parser));
+
                 // ---------------------------------------------------------
                 // 3. ANÁLISIS SEMÁNTICO
                 // ---------------------------------------------------------
