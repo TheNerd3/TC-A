@@ -3,9 +3,11 @@ lexer grammar CppSubsetLexer;
 // Keywords (placed before IDENTIFIER to match keywords first)
 // Data types
 INT: 'int';
+FLOAT: 'float';
 CHAR: 'char';
 DOUBLE: 'double';
 VOID: 'void';
+STRING: 'string';
 DATE: 'date';
 BOOL: 'bool';
 
@@ -88,6 +90,8 @@ DOUBLE_LITERAL
 BOOL_LITERAL
     : 'TRUE'
     | 'FALSE'
+    | 'true'
+    | 'false'
     | [01]
     ;
 

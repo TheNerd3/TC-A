@@ -10,6 +10,7 @@ globalItem
     : variableDecl
     | functionDecl
     | functionDef
+    | statement
     ;
 
 functionDecl
@@ -41,10 +42,12 @@ variableDeclNoSemi
 
 type
     : INT
+    | FLOAT
     | DOUBLE
     | CHAR
     | BOOL
     | VOID
+    | STRING
     | DATE
     ;
 

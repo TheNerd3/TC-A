@@ -12,6 +12,7 @@ public class SymbolTable {
         private final boolean array;
         private final int arraySize;
         private boolean initialized;
+        private int usages;
 
         public Symbol(String name, String type, boolean array, int arraySize, boolean initialized) {
             this.name = name;
@@ -19,6 +20,7 @@ public class SymbolTable {
             this.array = array;
             this.arraySize = arraySize;
             this.initialized = initialized;
+            this.usages = 0;
         }
 
         public String getName() {
@@ -43,6 +45,14 @@ public class SymbolTable {
 
         public void setInitialized(boolean initialized) {
             this.initialized = initialized;
+        }
+
+        public void markUsed() {
+            usages++;
+        }
+
+        public int getUsages() {
+            return usages;
         }
     }
 

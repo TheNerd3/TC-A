@@ -34,6 +34,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
     private final SymbolTable symbolTable = new SymbolTable();
     private final Map<String, FunctionSymbol> functions = new LinkedHashMap<>();
+    private final List<SymbolTable.Symbol> declaredSymbols = new ArrayList<>();
     private final List<String> errors = new ArrayList<>();
     private final List<String> warnings = new ArrayList<>();
 
@@ -63,16 +64,18 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         for (CppSubsetParser.GlobalItemContext item : ctx.globalItem()) {
             if (item.variableDecl() != null) {
                 visit(item.variableDecl());
+            } else if (item.statement() instanceof CppSubsetParser.VarDeclStmtContext varDeclStmt) {
+                visit(varDeclStmt.variableDecl());
             } else if (item.functionDecl() != null) {
                 registerFunction(
-                        item.functionDecl().type().getText(),
+                        normalizeType(item.functionDecl().type().getText()),
                         item.functionDecl().IDENTIFIER().getText(),
                         extractParamTypes(item.functionDecl().parameterList()),
                         false,
                         item.functionDecl());
             } else if (item.functionDef() != null) {
                 registerFunction(
-                        item.functionDef().type().getText(),
+                        normalizeType(item.functionDef().type().getText()),
                         item.functionDef().IDENTIFIER().getText(),
                         extractParamTypes(item.functionDef().parameterList()),
                         true,
@@ -83,19 +86,22 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         for (CppSubsetParser.GlobalItemContext item : ctx.globalItem()) {
             if (item.functionDef() != null) {
                 visit(item.functionDef());
+            } else if (item.statement() != null && !(item.statement() instanceof CppSubsetParser.VarDeclStmtContext)) {
+                visit(item.statement());
             }
         }
 
         if (!functions.containsKey("main")) {
-            warnings.add("warning: no se encontró la función 'main'.");
+            warning(ctx, "no se encontró la función 'main'.");
         }
 
         for (FunctionSymbol function : functions.values()) {
             if (!function.defined) {
-                warnings.add("warning: función declarada pero no definida: '" + function.name + "'.");
+                warning(ctx, "función declarada pero no definida: '" + function.name + "'.");
             }
         }
 
+        reportUnusedDeclarations();
         return null;
     }
 
@@ -118,7 +124,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         symbolTable.enterScope();
         if (ctx.parameterList() != null) {
             for (CppSubsetParser.ParameterContext parameter : ctx.parameterList().parameter()) {
-                String paramType = parameter.type().getText();
+                String paramType = normalizeType(parameter.type().getText());
                 String paramName = parameter.IDENTIFIER().getText();
 
                 if (TYPE_VOID.equals(paramType)) {
@@ -131,13 +137,12 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
                     continue;
                 }
 
-                symbolTable.defineVariable(paramName, paramType, true);
+                SymbolTable.Symbol symbol = symbolTable.defineVariable(paramName, paramType, true);
+                declaredSymbols.add(symbol);
             }
         }
 
-        for (CppSubsetParser.StatementContext statement : ctx.block().statement()) {
-            visit(statement);
-        }
+        visit(ctx.block());
 
         if (!TYPE_VOID.equals(function.returnType) && !currentFunctionHasReturn) {
             error(ctx, "la función '" + functionName + "' debe retornar un valor de tipo " + function.returnType + ".");
@@ -163,7 +168,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
     @Override
     public String visitVariableDecl(CppSubsetParser.VariableDeclContext ctx) {
-        String declaredType = ctx.type().getText();
+        String declaredType = normalizeType(ctx.type().getText());
         String name = ctx.IDENTIFIER().getText();
 
         if (TYPE_VOID.equals(declaredType)) {
@@ -176,6 +181,11 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             return TYPE_ERROR;
         }
 
+        if (functions.containsKey(name)) {
+            error(ctx, "'" + name + "' ya fue declarado como función y no puede reutilizarse como variable.");
+            return TYPE_ERROR;
+        }
+
         boolean hasInitializer = ctx.ASSIGN() != null;
         boolean isArray = ctx.LBRACK() != null;
 
@@ -185,15 +195,18 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
                 error(ctx, "el arreglo '" + name + "' debe tener tamaño mayor a 0.");
             }
 
-            symbolTable.defineArray(name, declaredType, size, hasInitializer);
+            SymbolTable.Symbol symbol = symbolTable.defineArray(name, declaredType, size, hasInitializer);
+            declaredSymbols.add(symbol);
 
             if (hasInitializer) {
                 warning(ctx, "la inicialización directa de arreglos no está soportada en este subconjunto; use asignaciones por índice.");
             }
-            return null;
+            return declaredType;
         }
 
         SymbolTable.Symbol symbol = symbolTable.defineVariable(name, declaredType, false);
+        declaredSymbols.add(symbol);
+
         if (hasInitializer) {
             String expressionType = visit(ctx.expression());
             if (!isAssignable(declaredType, expressionType)) {
@@ -203,7 +216,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             }
         }
 
-        return null;
+        return declaredType;
     }
 
     @Override
@@ -217,7 +230,11 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         SymbolTable.Symbol symbol = symbolTable.resolve(name);
 
         if (symbol == null) {
-            error(ctx, "variable no declarada: '" + name + "'.");
+            if (functions.containsKey(name)) {
+                error(ctx, "'" + name + "' es una función y no puede usarse como variable.");
+            } else {
+                error(ctx, "variable no declarada: '" + name + "'.");
+            }
             return TYPE_ERROR;
         }
 
@@ -305,6 +322,10 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
     @Override
     public String visitIfStatement(CppSubsetParser.IfStatementContext ctx) {
+        if (currentFunction == null) {
+            error(ctx, "sentencia if fuera de una función.");
+        }
+
         String conditionType = visit(ctx.expression());
         if (!TYPE_BOOL.equals(conditionType) && !TYPE_ERROR.equals(conditionType)) {
             error(ctx, "la condición de if debe ser de tipo bool.");
@@ -319,6 +340,10 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
     @Override
     public String visitWhileStatement(CppSubsetParser.WhileStatementContext ctx) {
+        if (currentFunction == null) {
+            error(ctx, "sentencia while fuera de una función.");
+        }
+
         String conditionType = visit(ctx.expression());
         if (!TYPE_BOOL.equals(conditionType) && !TYPE_ERROR.equals(conditionType)) {
             error(ctx, "la condición de while debe ser de tipo bool.");
@@ -332,6 +357,10 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
     @Override
     public String visitForStmt(CppSubsetParser.ForStmtContext ctx) {
+        if (currentFunction == null) {
+            error(ctx, "sentencia for fuera de una función.");
+        }
+
         symbolTable.enterScope();
 
         if (ctx.forInit() != null) {
@@ -367,7 +396,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
     @Override
     public String visitVariableDeclNoSemi(CppSubsetParser.VariableDeclNoSemiContext ctx) {
-        String declaredType = ctx.type().getText();
+        String declaredType = normalizeType(ctx.type().getText());
         String name = ctx.IDENTIFIER().getText();
 
         if (TYPE_VOID.equals(declaredType)) {
@@ -380,19 +409,28 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             return TYPE_ERROR;
         }
 
+        if (functions.containsKey(name)) {
+            error(ctx, "'" + name + "' ya fue declarado como función y no puede reutilizarse como variable.");
+            return TYPE_ERROR;
+        }
+
         boolean hasInitializer = ctx.ASSIGN() != null;
         boolean isArray = ctx.LBRACK() != null;
 
         if (isArray) {
             int size = Integer.parseInt(ctx.INT_LITERAL().getText());
-            symbolTable.defineArray(name, declaredType, size, hasInitializer);
+            SymbolTable.Symbol symbol = symbolTable.defineArray(name, declaredType, size, hasInitializer);
+            declaredSymbols.add(symbol);
+
             if (hasInitializer) {
                 warning(ctx, "la inicialización directa de arreglos no está soportada en este subconjunto; use asignaciones por índice.");
             }
-            return null;
+            return declaredType;
         }
 
         SymbolTable.Symbol symbol = symbolTable.defineVariable(name, declaredType, false);
+        declaredSymbols.add(symbol);
+
         if (hasInitializer) {
             String expressionType = visit(ctx.expression());
             if (!isAssignable(declaredType, expressionType)) {
@@ -402,7 +440,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             }
         }
 
-        return null;
+        return declaredType;
     }
 
     @Override
@@ -519,10 +557,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             return TYPE_ERROR;
         }
 
-        if (!symbol.isInitialized()) {
-            warning(ctx, "uso de variable potencialmente no inicializada: '" + name + "'.");
-        }
-
+        symbol.markUsed();
         symbol.setInitialized(true);
         return symbol.getType();
     }
@@ -579,6 +614,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             error(ctx, "el índice del arreglo '" + name + "' debe ser de tipo int.");
         }
 
+        symbol.markUsed();
         if (!symbol.isInitialized()) {
             warning(ctx, "uso de arreglo potencialmente no inicializado: '" + name + "'.");
         }
@@ -592,7 +628,11 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         SymbolTable.Symbol symbol = symbolTable.resolve(name);
 
         if (symbol == null) {
-            error(ctx, "variable no declarada: '" + name + "'.");
+            if (functions.containsKey(name)) {
+                error(ctx, "'" + name + "' es una función y no puede usarse como variable.");
+            } else {
+                error(ctx, "variable no declarada: '" + name + "'.");
+            }
             return TYPE_ERROR;
         }
 
@@ -601,6 +641,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
             return TYPE_ERROR;
         }
 
+        symbol.markUsed();
         if (!symbol.isInitialized()) {
             warning(ctx, "uso de variable potencialmente no inicializada: '" + name + "'.");
         }
@@ -655,32 +696,37 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         }
 
         for (CppSubsetParser.ParameterContext parameter : parameterList.parameter()) {
-            types.add(parameter.type().getText());
+            types.add(normalizeType(parameter.type().getText()));
         }
         return types;
     }
 
     private void registerFunction(String returnType, String functionName, List<String> paramTypes, boolean definition,
                                   ParserRuleContext ctx) {
-        FunctionSymbol existing = functions.get(functionName);
-        if (existing == null) {
-            functions.put(functionName, new FunctionSymbol(functionName, returnType, paramTypes, definition));
+        if (functions.containsKey(functionName)) {
+            FunctionSymbol existing = functions.get(functionName);
+            if (!existing.returnType.equals(returnType) || !sameParams(existing.paramTypes, paramTypes)) {
+                error(ctx, "firma incompatible para función '" + functionName + "'.");
+                return;
+            }
+
+            if (definition && existing.defined) {
+                error(ctx, "redefinición de función: '" + functionName + "'.");
+                return;
+            }
+
+            if (definition) {
+                existing.defined = true;
+            }
             return;
         }
 
-        if (!existing.returnType.equals(returnType) || !sameParams(existing.paramTypes, paramTypes)) {
-            error(ctx, "firma incompatible para función '" + functionName + "'.");
+        if (symbolTable.resolve(functionName) != null) {
+            error(ctx, "'" + functionName + "' ya fue declarado como variable y no puede reutilizarse como función.");
             return;
         }
 
-        if (definition && existing.defined) {
-            error(ctx, "redefinición de función: '" + functionName + "'.");
-            return;
-        }
-
-        if (definition) {
-            existing.defined = true;
-        }
+        functions.put(functionName, new FunctionSymbol(functionName, returnType, paramTypes, definition));
     }
 
     private boolean sameParams(List<String> a, List<String> b) {
@@ -695,6 +741,16 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         }
 
         return true;
+    }
+
+    private String normalizeType(String type) {
+        if ("float".equals(type)) {
+            return TYPE_DOUBLE;
+        }
+        if ("string".equals(type)) {
+            return TYPE_STRING;
+        }
+        return type;
     }
 
     private boolean isAssignable(String target, String source) {
@@ -732,13 +788,31 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
         return TYPE_INT;
     }
 
+    private void reportUnusedDeclarations() {
+        for (SymbolTable.Symbol symbol : declaredSymbols) {
+            if (symbol.getUsages() == 0) {
+                warning(null, "identificador declarado pero no usado: '" + symbol.getName() + "'.");
+            }
+        }
+    }
+
     private void error(ParserRuleContext ctx, String message) {
+        if (ctx == null) {
+            errors.add(message);
+            return;
+        }
+
         int line = ctx.getStart().getLine();
         int col = ctx.getStart().getCharPositionInLine();
         errors.add("error(" + line + ":" + col + "): " + message);
     }
 
     private void warning(ParserRuleContext ctx, String message) {
+        if (ctx == null) {
+            warnings.add("warning: " + message);
+            return;
+        }
+
         int line = ctx.getStart().getLine();
         int col = ctx.getStart().getCharPositionInLine();
         warnings.add("warning(" + line + ":" + col + "): " + message);
