@@ -55,6 +55,7 @@ block
 // Statements
 statement
     : IDENTIFIER ASSIGN expression SEMI                                     # Assign
+    | IDENTIFIER LBRACK expression RBRACK ASSIGN expression SEMI            # ArrayAssign
     | RETURN expression SEMI                                                # ReturnExpr
     | RETURN SEMI                                                           # ReturnVoid
     | expression SEMI                                                       # PrintExpr
@@ -112,6 +113,7 @@ expression
     | BOOL_LITERAL                                              # Bool
     | STRING_LITERAL                                            # StringLit
     | DATE_LITERAL                                              # DateLit
+    | IDENTIFIER LBRACK expression RBRACK                       # ArrayAccess
     | IDENTIFIER                                                # Id
     | LPAREN expression RPAREN                                  # Parens
     ;

@@ -111,22 +111,27 @@ public class LexerMain {
                 // ---------------------------------------------------------
                 System.out.println("\n" + color(ANSI_YELLOW, "--- Iniciando Análisis Semántico ---"));
 
-                try {
-                    // Instanciamos y ejecutamos nuestro Visitor
-                    SemanticVisitor visitor = new SemanticVisitor();
-                    visitor.visit(tree);
+                SemanticVisitor visitor = new SemanticVisitor();
+                visitor.visit(tree);
 
-                    // Si llegamos a esta línea sin que lance excepciones, el código es 100% válido
-                    System.out.println("\n" + color(ANSI_GREEN, "Análisis Semántico completado. ¡El código es semánticamente correcto!"));
-
-                } catch (RuntimeException e) {
-                    // ATRAPAMOS EL ERROR: En lugar de un pantallazo rojo de Java,
-                    // mostramos el error semántico limpio y abortamos la compilación.
-                    System.out.println();
-                    System.err.println(color(ANSI_RED, "■ " + e.getMessage()));
-                    System.err.println(color(ANSI_RED, "■ La compilación ha sido abortada debido a violaciones semánticas."));
-                    System.exit(3); // Código de salida 3 para errores semánticos
+                if (visitor.hasWarnings()) {
+                    System.out.println(color(ANSI_YELLOW, "Warnings semánticos:"));
+                    for (String warning : visitor.getWarnings()) {
+                        System.out.println(color(ANSI_YELLOW, "- " + warning));
+                    }
                 }
+
+                if (visitor.hasErrors()) {
+                    System.out.println();
+                    System.err.println(color(ANSI_RED, "Errores semánticos detectados:"));
+                    for (String error : visitor.getErrors()) {
+                        System.err.println(color(ANSI_RED, "- " + error));
+                    }
+                    System.err.println(color(ANSI_RED, "La compilación ha sido abortada debido a violaciones semánticas."));
+                    System.exit(3);
+                }
+
+                System.out.println("\n" + color(ANSI_GREEN, "Análisis Semántico completado. Sin errores críticos."));
             }
 
         } catch (IOException e) {

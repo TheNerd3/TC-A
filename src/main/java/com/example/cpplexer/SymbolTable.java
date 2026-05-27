@@ -1,45 +1,90 @@
 package com.example.cpplexer;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Stack;
 
 public class SymbolTable {
-    // Una pila de diccionarios. Cada llave '{' crea un diccionario nuevo.
-    private Stack<Map<String, Object>> scopes;
+    public static class Symbol {
+        private final String name;
+        private final String type;
+        private final boolean array;
+        private final int arraySize;
+        private boolean initialized;
 
-    public SymbolTable() {
-        scopes = new Stack<>();
-        enterScope(); // Creamos el ámbito Global al iniciar
+        public Symbol(String name, String type, boolean array, int arraySize, boolean initialized) {
+            this.name = name;
+            this.type = type;
+            this.array = array;
+            this.arraySize = arraySize;
+            this.initialized = initialized;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public boolean isArray() {
+            return array;
+        }
+
+        public int getArraySize() {
+            return arraySize;
+        }
+
+        public boolean isInitialized() {
+            return initialized;
+        }
+
+        public void setInitialized(boolean initialized) {
+            this.initialized = initialized;
+        }
     }
 
-    // Entrar a una función o bloque {
+    private final Deque<Map<String, Symbol>> scopes;
+
+    public SymbolTable() {
+        scopes = new ArrayDeque<>();
+        enterScope();
+    }
+
     public void enterScope() {
         scopes.push(new HashMap<>());
     }
 
-    // Salir de una función o bloque }
     public void exitScope() {
         if (scopes.size() > 1) {
             scopes.pop();
         }
     }
 
-    // Guardar una nueva variable
-    public void define(String name, Object value) {
-        if (scopes.peek().containsKey(name)) {
-            throw new RuntimeException("ERROR SEMÁNTICO: La variable '" + name + "' ya fue declarada en este bloque.");
-        }
-        scopes.peek().put(name, value);
+    public boolean existsInCurrentScope(String name) {
+        return scopes.peek().containsKey(name);
     }
 
-    // Buscar el valor de una variable (desde el bloque local hasta el global)
-    public Object resolve(String name) {
-        for (int i = scopes.size() - 1; i >= 0; i--) {
-            if (scopes.get(i).containsKey(name)) {
-                return scopes.get(i).get(name);
+    public Symbol defineVariable(String name, String type, boolean initialized) {
+        Symbol symbol = new Symbol(name, type, false, 0, initialized);
+        scopes.peek().put(name, symbol);
+        return symbol;
+    }
+
+    public Symbol defineArray(String name, String type, int size, boolean initialized) {
+        Symbol symbol = new Symbol(name, type, true, size, initialized);
+        scopes.peek().put(name, symbol);
+        return symbol;
+    }
+
+    public Symbol resolve(String name) {
+        for (Map<String, Symbol> scope : scopes) {
+            if (scope.containsKey(name)) {
+                return scope.get(name);
             }
         }
-        throw new RuntimeException("ERROR SEMÁNTICO: La variable '" + name + "' no está declarada.");
+        return null;
     }
 }
