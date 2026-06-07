@@ -1,10 +1,11 @@
 # Compilador de Subconjunto C++ (ANTLR4 + Java)
 
-Proyecto de Tecnicas de Compilacion con implementacion hasta la fase 3:
+Proyecto de Tecnicas de Compilacion con implementacion hasta la fase 4 inicial:
 
 1. Analisis lexico
 2. Analisis sintactico (AST)
 3. Analisis semantico
+4. Generacion de codigo intermedio
 
 ## Funcionalidades implementadas
 
@@ -39,6 +40,12 @@ Proyecto de Tecnicas de Compilacion con implementacion hasta la fase 3:
   - `break` y `continue` solo dentro de bucles
 - Reporte separado de errores (criticos) y warnings (no criticos).
 
+### 4) Codigo intermedio
+- Generacion de codigo de tres direcciones cuando no hay errores criticos.
+- Traduccion de asignaciones, expresiones, arreglos, llamadas a funciones y retornos.
+- Traduccion inicial de `if`, `while`, `for`, `break` y `continue` usando etiquetas.
+- Escritura del resultado en `output/intermediate_code.txt`.
+
 ## Requisitos
 - JDK 17+
 - Maven 3.6+
@@ -52,7 +59,7 @@ mvn clean package
 ## Ejecucion
 
 ```bash
-mvn -q exec:java -Dexec.mainClass="com.example.cpplexer.LexerMain" -Dexec.args="examples/valid/ejemploFinal.cpp"
+mvn -q exec:java -Dexec.mainClass="com.example.cpplexer.LexerMain" -Dexec.args="examples/final/ejemploCorrecto.cpp"
 ```
 
 ## Casos de prueba sugeridos
@@ -60,7 +67,7 @@ mvn -q exec:java -Dexec.mainClass="com.example.cpplexer.LexerMain" -Dexec.args="
 ### Validos
 - `examples/valid/ejemplo1.cpp`
 - `examples/valid/ejemplo2.cpp`
-- `examples/valid/ejemploFinal.cpp`
+- `examples/final/ejemploCorrecto.cpp`
 
 ### Invalidos (lexico)
 - `examples/invalid/error_lexico1.cpp`
@@ -69,6 +76,7 @@ mvn -q exec:java -Dexec.mainClass="com.example.cpplexer.LexerMain" -Dexec.args="
 ### Invalidos (semantico)
 - `examples/invalid/error_semantico1.cpp`
 - `examples/invalid/error_semantico2.cpp`
+- `examples/final/ejemploErrores.cpp`
 
 ## Codigos de salida
 - `0`: sin errores criticos
