@@ -7,6 +7,13 @@ import java.util.List;
 public class IntermediateCode {
     private final List<String> instructions = new ArrayList<>();
 
+    public IntermediateCode() {
+    }
+
+    public IntermediateCode(List<String> instructions) {
+        this.instructions.addAll(instructions);
+    }
+
     public void add(String instruction) {
         instructions.add(instruction);
     }
