@@ -1,8 +1,13 @@
 package com.example.cpplexer;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.example.cpplexer.ir.IntermediateCode;
+import com.example.cpplexer.ir.IntermediateCodeGenerator;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -132,6 +137,22 @@ public class LexerMain {
                 }
 
                 System.out.println("\n" + color(ANSI_GREEN, "Análisis Semántico completado. Sin errores críticos."));
+
+                // ---------------------------------------------------------
+                // 4. GENERACIÓN DE CÓDIGO INTERMEDIO
+                // ---------------------------------------------------------
+                System.out.println("\n" + color(ANSI_YELLOW, "--- Generando Código Intermedio ---"));
+
+                IntermediateCodeGenerator codeGenerator = new IntermediateCodeGenerator();
+                codeGenerator.visit(tree);
+                IntermediateCode intermediateCode = codeGenerator.getCode();
+
+                Path outputDir = Path.of("output");
+                Files.createDirectories(outputDir);
+                Path intermediateOutput = outputDir.resolve("intermediate_code.txt");
+                Files.writeString(intermediateOutput, intermediateCode.asText());
+
+                System.out.println(color(ANSI_GREEN, "Código intermedio generado en: " + intermediateOutput));
             }
 
         } catch (IOException e) {
