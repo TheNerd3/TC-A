@@ -5,7 +5,13 @@ import java.util.List;
 
 import com.example.cpplexer.ir.IntermediateCode;
 
-public class ExpressionSimplifierOptimizer {
+public class ExpressionSimplifierOptimizer implements Optimizer {
+    @Override
+    public String getName() {
+        return "simplificacion de expresiones";
+    }
+
+    @Override
     public IntermediateCode optimize(IntermediateCode input) {
         List<String> optimized = new ArrayList<>();
 
