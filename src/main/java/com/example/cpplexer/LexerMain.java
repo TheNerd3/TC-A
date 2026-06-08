@@ -8,7 +8,10 @@ import java.util.List;
 
 import com.example.cpplexer.ir.IntermediateCode;
 import com.example.cpplexer.ir.IntermediateCodeGenerator;
+import com.example.cpplexer.optimizer.ConstantPropagationOptimizer;
+import com.example.cpplexer.optimizer.DeadCodeEliminationOptimizer;
 import com.example.cpplexer.optimizer.ExpressionSimplifierOptimizer;
+import com.example.cpplexer.optimizer.OptimizerPipeline;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -160,12 +163,16 @@ public class LexerMain {
                 // ---------------------------------------------------------
                 System.out.println("\n" + color(ANSI_YELLOW, "--- Optimizando Código Intermedio ---"));
 
-                ExpressionSimplifierOptimizer optimizer = new ExpressionSimplifierOptimizer();
-                IntermediateCode optimizedCode = optimizer.optimize(intermediateCode);
+                OptimizerPipeline optimizerPipeline = new OptimizerPipeline()
+                        .add(new ConstantPropagationOptimizer())
+                        .add(new ExpressionSimplifierOptimizer())
+                        .add(new DeadCodeEliminationOptimizer());
+                IntermediateCode optimizedCode = optimizerPipeline.optimize(intermediateCode);
                 Path optimizedOutput = outputDir.resolve("optimized_code.txt");
                 Files.writeString(optimizedOutput, optimizedCode.asText());
 
                 System.out.println(color(ANSI_GREEN, "Código optimizado generado en: " + optimizedOutput));
+                System.out.println(color(ANSI_GREEN, "Optimizaciones aplicadas: " + String.join(", ", optimizerPipeline.getOptimizerNames())));
             }
 
         } catch (IOException e) {
