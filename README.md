@@ -1,11 +1,13 @@
 # Compilador de Subconjunto C++ (ANTLR4 + Java)
 
-Proyecto de Tecnicas de Compilacion con implementacion hasta la fase 4 inicial:
+Proyecto de Tecnicas de Compilacion con implementacion de pipeline completo:
 
 1. Analisis lexico
 2. Analisis sintactico (AST)
 3. Analisis semantico
 4. Generacion de codigo intermedio
+5. Optimizacion de codigo
+6. Generacion de archivos de salida
 
 ## Funcionalidades implementadas
 
@@ -68,6 +70,11 @@ mvn clean package
 mvn -q exec:java -Dexec.mainClass="com.example.cpplexer.LexerMain" -Dexec.args="examples/final/ejemploCorrecto.cpp"
 ```
 
+Si la compilacion no tiene errores criticos, se generan:
+
+- `output/intermediate_code.txt`
+- `output/optimized_code.txt`
+
 ## Casos de prueba sugeridos
 
 ### Validos
@@ -90,3 +97,8 @@ mvn -q exec:java -Dexec.mainClass="com.example.cpplexer.LexerMain" -Dexec.args="
 - `1`: error general / sintactico
 - `2`: errores lexicos
 - `3`: errores semanticos
+
+## Documentacion
+
+- `MANUAL_USUARIO.md`: instalacion, ejecucion e interpretacion de salidas.
+- `INFORME_TECNICO.md`: arquitectura, fases, decisiones tecnicas, pruebas y conclusiones.

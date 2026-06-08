@@ -19,6 +19,12 @@ public class ConstantPropagationOptimizer implements Optimizer {
         List<String> optimized = new ArrayList<>();
 
         for (String instruction : input.getInstructions()) {
+            if (isControlBoundary(instruction)) {
+                constants.clear();
+                optimized.add(instruction);
+                continue;
+            }
+
             String rewritten = rewriteInstruction(instruction, constants);
             optimized.add(rewritten);
             updateConstants(rewritten, constants);
@@ -83,5 +89,13 @@ public class ConstantPropagationOptimizer implements Optimizer {
 
     private boolean isSimpleIdentifier(String value) {
         return value.matches("[a-zA-Z_][a-zA-Z0-9_]*");
+    }
+
+    private boolean isControlBoundary(String instruction) {
+        return instruction.endsWith(":")
+                || instruction.startsWith("goto ")
+                || instruction.startsWith("ifFalse ")
+                || instruction.startsWith("func ")
+                || instruction.startsWith("endfunc ");
     }
 }

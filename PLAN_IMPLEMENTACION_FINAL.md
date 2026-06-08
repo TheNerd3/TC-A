@@ -1,21 +1,18 @@
-# Plan de Implementacion para Completar el Trabajo Final
+# Estado de Implementacion Final
 
-Este documento resume lo que falta implementar para que el proyecto cumpla con la consigna del Trabajo Final de Tecnicas de Compilacion 2026.
+Este documento resume el estado final de implementacion del Trabajo Final de Tecnicas de Compilacion 2026.
 
 ## Estado Actual
 
-El compilador ya tiene implementadas las primeras tres fases:
+El compilador tiene implementadas las fases requeridas:
 
 1. Analisis lexico con ANTLR4.
 2. Analisis sintactico con parser ANTLR4 y visualizacion del arbol generado.
 3. Analisis semantico con tabla de simbolos, ambitos, funciones, validacion de tipos, errores y warnings.
-
-La consigna exige ademas:
-
 4. Generacion de codigo intermedio.
 5. Optimizacion de codigo.
 6. Generacion de archivos de salida.
-7. Informe tecnico y manual de usuario.
+7. Documentacion tecnica y manual de usuario.
 
 ## Objetivo de la Implementacion
 
@@ -35,11 +32,10 @@ Fuente C++
 
 ## Fase 4: Generacion de Codigo Intermedio
 
-Se implementara un generador de codigo de tres direcciones basado en visitor.
+Se implemento un generador de codigo de tres direcciones basado en visitor.
 
-Archivos propuestos:
+Archivos principales:
 
-- `src/main/java/com/example/cpplexer/ir/Instruction.java`
 - `src/main/java/com/example/cpplexer/ir/IntermediateCode.java`
 - `src/main/java/com/example/cpplexer/ir/IntermediateCodeGenerator.java`
 
@@ -88,11 +84,12 @@ endfunc main
 
 ## Fase 5: Optimizacion
 
-Se implementara un optimizador sobre la lista de instrucciones intermedias.
+Se implemento un optimizador sobre la lista de instrucciones intermedias.
 
 Archivos propuestos:
 
 - `src/main/java/com/example/cpplexer/optimizer/Optimizer.java`
+- `src/main/java/com/example/cpplexer/optimizer/OptimizerPipeline.java`
 - `src/main/java/com/example/cpplexer/optimizer/ConstantPropagationOptimizer.java`
 - `src/main/java/com/example/cpplexer/optimizer/DeadCodeEliminationOptimizer.java`
 - `src/main/java/com/example/cpplexer/optimizer/ExpressionSimplifierOptimizer.java`
@@ -117,7 +114,7 @@ Tecnicas requeridas:
 
 ## Fase 6: Archivos de Salida
 
-Se agregara escritura de archivos en una carpeta de salida.
+Se agrego escritura de archivos en una carpeta de salida.
 
 Carpeta propuesta:
 
@@ -183,11 +180,11 @@ Criterios de aceptacion:
 
 ## Documentacion Pendiente
 
-Para cumplir la consigna tambien se debe preparar:
+Documentacion preparada:
 
-- Informe tecnico en PDF.
-- Manual de usuario.
-- README actualizado.
+- `INFORME_TECNICO.md`
+- `MANUAL_USUARIO.md`
+- `README.md`
 
 Contenido minimo del informe:
 
@@ -205,12 +202,6 @@ Contenido minimo del informe:
 - Conclusiones.
 - Referencias.
 
-## Prioridad Recomendada
+## Estado de Cierre
 
-1. Implementar codigo intermedio.
-2. Integrarlo en `LexerMain`.
-3. Generar archivos de salida.
-4. Implementar las tres optimizaciones.
-5. Agregar pruebas de ejemplo para codigo intermedio y optimizado.
-6. Actualizar README.
-7. Preparar informe tecnico y manual de usuario.
+El proyecto queda listo para demostracion con ejemplos validos e invalidos, generacion de codigo intermedio, optimizacion y documentacion de uso.
