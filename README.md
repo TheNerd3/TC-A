@@ -46,6 +46,12 @@ Proyecto de Tecnicas de Compilacion con implementacion hasta la fase 4 inicial:
 - Traduccion inicial de `if`, `while`, `for`, `break` y `continue` usando etiquetas.
 - Escritura del resultado en `output/intermediate_code.txt`.
 
+### 5) Optimizacion inicial
+- Propagacion de constantes.
+- Simplificacion de expresiones aritmeticas simples.
+- Eliminacion de temporales muertos.
+- Escritura del resultado en `output/optimized_code.txt`.
+
 ## Requisitos
 - JDK 17+
 - Maven 3.6+
@@ -67,6 +73,7 @@ mvn -q exec:java -Dexec.mainClass="com.example.cpplexer.LexerMain" -Dexec.args="
 ### Validos
 - `examples/valid/ejemplo1.cpp`
 - `examples/valid/ejemplo2.cpp`
+- `examples/valid/optimizacion.cpp`
 - `examples/final/ejemploCorrecto.cpp`
 
 ### Invalidos (lexico)
