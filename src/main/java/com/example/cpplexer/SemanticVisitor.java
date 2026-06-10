@@ -37,6 +37,7 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     private final List<SymbolTable.Symbol> declaredSymbols = new ArrayList<>();
     private final List<String> errors = new ArrayList<>();
     private final List<String> warnings = new ArrayList<>();
+    private final List<String> sourceLines;
 
     private String currentFunction = null;
     private String currentFunctionReturnType = null;
@@ -57,6 +58,14 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
 
     public boolean hasWarnings() {
         return !warnings.isEmpty();
+    }
+
+    public SemanticVisitor() {
+        this.sourceLines = null;
+    }
+
+    public SemanticVisitor(List<String> sourceLines) {
+        this.sourceLines = sourceLines;
     }
 
     @Override
@@ -797,24 +806,35 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     }
 
     private void error(ParserRuleContext ctx, String message) {
-        if (ctx == null) {
-            errors.add(message);
-            return;
-        }
-
-        int line = ctx.getStart().getLine();
-        int col = ctx.getStart().getCharPositionInLine();
-        errors.add("error(" + line + ":" + col + "): " + message);
+        String suggestion = buildSuggestion(message, ctx);
+        String formatted = ErrorReporter.format(ctx, sourceLines, message, suggestion);
+        errors.add(formatted);
     }
 
     private void warning(ParserRuleContext ctx, String message) {
-        if (ctx == null) {
-            warnings.add("warning: " + message);
-            return;
-        }
+        String suggestion = buildSuggestion(message, ctx);
+        String formatted = ErrorReporter.format(ctx, sourceLines, "warning: " + message, suggestion);
+        warnings.add(formatted);
+    }
 
-        int line = ctx.getStart().getLine();
-        int col = ctx.getStart().getCharPositionInLine();
-        warnings.add("warning(" + line + ":" + col + "): " + message);
+    private String buildSuggestion(String message, ParserRuleContext ctx) {
+        if (message == null) return null;
+        String m = message.toLowerCase();
+        if (m.contains("variable no declarada") || m.contains("variable no declarada")) {
+            return "Declare la variable antes de usarla o verifique la ortografía del identificador.";
+        }
+        if (m.contains("identificador redeclarado") || m.contains("redeclarado")) {
+            return "Renombre la nueva declaración o elimine la anterior para evitar la redeclaración.";
+        }
+        if (m.contains("tipos incompatibles") || m.contains("incompatible")) {
+            return "Verifique los tipos involucrados o aplique una conversión/cast si corresponde.";
+        }
+        if (m.contains("llamada a función no declarada")) {
+            return "Declare la función o incluya el prototipo antes de la llamada.";
+        }
+        if (m.contains("debe retornar") || m.contains("return fuera") || m.contains("la función ")) {
+            return "Asegúrese de que todas las rutas de retorno devuelvan un valor del tipo declarado.";
+        }
+        return null;
     }
 }

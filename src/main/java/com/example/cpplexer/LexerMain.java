@@ -18,6 +18,11 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.gui.TreeViewer;
+import javax.swing.JFrame;
+import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
+import java.util.Arrays;
 
 public class LexerMain {
     private static final String ANSI_RESET = "\u001B[0m";
@@ -32,6 +37,7 @@ public class LexerMain {
         }
 
         String path = args[0];
+        boolean showGui = Arrays.asList(args).contains("--gui") || Arrays.asList(args).contains("-g");
 
         try {
             // ---------------------------------------------------------
@@ -101,7 +107,7 @@ public class LexerMain {
                 tokens.seek(0);
 
                 CppSubsetParser parser = new CppSubsetParser(tokens);
-                ParseTree tree = parser.program(); // Empezamos a leer desde la regla raíz (program)
+                CppSubsetParser.ProgramContext tree = parser.program(); // Empezamos a leer desde la regla raíz (program)
 
                 // Defensa del compilador: Abortar si hay errores sintácticos
                 if (parser.getNumberOfSyntaxErrors() > 0) {
@@ -112,6 +118,23 @@ public class LexerMain {
 
                 System.out.println("\n" + color(ANSI_GREEN, "Análisis Sintáctico completado (AST generado con éxito)."));
 
+                // Si se solicita, mostrar una ventana gráfica con el AST usando ANTLR TreeViewer
+                if (showGui) {
+                    SwingUtilities.invokeLater(() -> {
+                        TreeViewer viewer = new TreeViewer(Arrays.asList(parser.getRuleNames()), tree);
+                        viewer.setScale(1.5);
+
+                        JFrame frame = new JFrame("AST Visualizer - Compilador C++");
+                        JScrollPane scrollPane = new JScrollPane(viewer);
+                        frame.add(scrollPane);
+
+                        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                        frame.setSize(1000, 700);
+                        frame.setLocationRelativeTo(null);
+                        frame.setVisible(true);
+                    });
+                }
+
                 System.out.println(color(ANSI_YELLOW, "Estructura del AST:"));
                 System.out.println(tree.toStringTree(parser));
 
@@ -120,7 +143,8 @@ public class LexerMain {
                 // ---------------------------------------------------------
                 System.out.println("\n" + color(ANSI_YELLOW, "--- Iniciando Análisis Semántico ---"));
 
-                SemanticVisitor visitor = new SemanticVisitor();
+                List<String> sourceLines = Files.readAllLines(Path.of(path));
+                SemanticVisitor visitor = new SemanticVisitor(sourceLines);
                 visitor.visit(tree);
 
                 if (visitor.hasWarnings()) {
