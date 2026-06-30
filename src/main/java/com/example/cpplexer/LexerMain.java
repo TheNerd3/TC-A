@@ -6,12 +6,13 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.cpplexer.ai.AIRecommendationService;
 import com.example.cpplexer.ir.IntermediateCode;
 import com.example.cpplexer.ir.IntermediateCodeGenerator;
 import com.example.cpplexer.optimizer.ConstantPropagationOptimizer;
 import com.example.cpplexer.optimizer.DeadCodeEliminationOptimizer;
 import com.example.cpplexer.optimizer.ExpressionSimplifierOptimizer;
-import com.example.cpplexer.optimizer.OptimizerPipeline;
+import com.example.cpplexer.optimizer.Optimizer;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -160,6 +161,12 @@ public class LexerMain {
                     for (String error : visitor.getErrors()) {
                         System.err.println(color(ANSI_RED, "- " + error));
                     }
+                    Path outputDir = Path.of("output");
+                    Files.createDirectories(outputDir);
+                    String aiReportContent = AIRecommendationService.buildAiReport(path, visitor.getErrors(), visitor.getWarnings(), new ArrayList<>());
+                    Path aiReportOutput = outputDir.resolve("ai_report.txt");
+                    Files.writeString(aiReportOutput, aiReportContent);
+                    System.err.println(color(ANSI_YELLOW, "Reporte AI generado en: " + aiReportOutput));
                     System.err.println(color(ANSI_RED, "La compilación ha sido abortada debido a violaciones semánticas."));
                     System.exit(3);
                 }
@@ -187,16 +194,31 @@ public class LexerMain {
                 // ---------------------------------------------------------
                 System.out.println("\n" + color(ANSI_YELLOW, "--- Optimizando Código Intermedio ---"));
 
-                OptimizerPipeline optimizerPipeline = new OptimizerPipeline()
-                        .add(new ConstantPropagationOptimizer())
-                        .add(new ExpressionSimplifierOptimizer())
-                        .add(new DeadCodeEliminationOptimizer());
-                IntermediateCode optimizedCode = optimizerPipeline.optimize(intermediateCode);
+                List<Optimizer> optimizers = List.of(
+                    new ConstantPropagationOptimizer(),
+                    new ExpressionSimplifierOptimizer(),
+                    new DeadCodeEliminationOptimizer());
+                IntermediateCode current = intermediateCode;
+                List<String> optimizationExplanations = new ArrayList<>();
+
+                for (Optimizer optimizer : optimizers) {
+                    IntermediateCode before = current;
+                    IntermediateCode after = optimizer.optimize(current);
+                    optimizationExplanations.add(AIRecommendationService.explainOptimizationPass(optimizer.getName(), before.getInstructions(), after.getInstructions()));
+                    current = after;
+                }
+
+                IntermediateCode optimizedCode = current;
                 Path optimizedOutput = outputDir.resolve("optimized_code.txt");
                 Files.writeString(optimizedOutput, optimizedCode.asText());
 
                 System.out.println(color(ANSI_GREEN, "Código optimizado generado en: " + optimizedOutput));
-                System.out.println(color(ANSI_GREEN, "Optimizaciones aplicadas: " + String.join(", ", optimizerPipeline.getOptimizerNames())));
+                System.out.println(color(ANSI_GREEN, "Optimizaciones aplicadas: " + String.join(", ", optimizers.stream().map(Optimizer::getName).toList())));
+
+                String aiReportContent = AIRecommendationService.buildAiReport(path, visitor.getErrors(), visitor.getWarnings(), optimizationExplanations);
+                Path aiReportOutput = outputDir.resolve("ai_report.txt");
+                Files.writeString(aiReportOutput, aiReportContent);
+                System.out.println(color(ANSI_GREEN, "Reporte AI generado en: " + aiReportOutput));
             }
 
         } catch (IOException e) {
