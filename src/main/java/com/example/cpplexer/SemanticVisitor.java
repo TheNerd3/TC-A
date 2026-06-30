@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.example.cpplexer.ai.AIRecommendationService;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
@@ -806,13 +807,19 @@ public class SemanticVisitor extends CppSubsetParserBaseVisitor<String> {
     }
 
     private void error(ParserRuleContext ctx, String message) {
-        String suggestion = buildSuggestion(message, ctx);
+        String suggestion = AIRecommendationService.explainSemanticIssue(message, ctx, sourceLines);
+        if (suggestion == null) {
+            suggestion = buildSuggestion(message, ctx);
+        }
         String formatted = ErrorReporter.format(ctx, sourceLines, message, suggestion);
         errors.add(formatted);
     }
 
     private void warning(ParserRuleContext ctx, String message) {
-        String suggestion = buildSuggestion(message, ctx);
+        String suggestion = AIRecommendationService.explainSemanticIssue(message, ctx, sourceLines);
+        if (suggestion == null) {
+            suggestion = buildSuggestion(message, ctx);
+        }
         String formatted = ErrorReporter.format(ctx, sourceLines, "warning: " + message, suggestion);
         warnings.add(formatted);
     }
