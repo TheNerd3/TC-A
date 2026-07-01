@@ -7,20 +7,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.example.cpplexer.ai.AIRecommendationService;
+import com.example.cpplexer.ast.AstBuilder;
+import com.example.cpplexer.ast.AstNode;
 import com.example.cpplexer.ir.IntermediateCode;
 import com.example.cpplexer.ir.IntermediateCodeGenerator;
 import com.example.cpplexer.optimizer.ConstantPropagationOptimizer;
 import com.example.cpplexer.optimizer.DeadCodeEliminationOptimizer;
 import com.example.cpplexer.optimizer.ExpressionSimplifierOptimizer;
+import com.example.cpplexer.optimizer.CopyPropagationOptimizer;
+import com.example.cpplexer.optimizer.MLDeadCodeOptimizer;
 import com.example.cpplexer.optimizer.Optimizer;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.gui.TreeViewer;
 import javax.swing.JFrame;
+import javax.swing.JTree;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import java.util.Arrays;
@@ -119,11 +122,16 @@ public class LexerMain {
 
                 System.out.println("\n" + color(ANSI_GREEN, "Análisis Sintáctico completado (AST generado con éxito)."));
 
-                // Si se solicita, mostrar una ventana gráfica con el AST usando ANTLR TreeViewer
+                AstNode ast = new AstBuilder().visit(tree);
+
+                // Si se solicita, mostrar una ventana gráfica con el AST propio
                 if (showGui) {
                     SwingUtilities.invokeLater(() -> {
-                        TreeViewer viewer = new TreeViewer(Arrays.asList(parser.getRuleNames()), tree);
-                        viewer.setScale(1.5);
+                        JTree viewer = new JTree(ast.toSwingNode());
+                        viewer.setRootVisible(true);
+                        for (int row = 0; row < viewer.getRowCount(); row++) {
+                            viewer.expandRow(row);
+                        }
 
                         JFrame frame = new JFrame("AST Visualizer - Compilador C++");
                         JScrollPane scrollPane = new JScrollPane(viewer);
@@ -137,7 +145,7 @@ public class LexerMain {
                 }
 
                 System.out.println(color(ANSI_YELLOW, "Estructura del AST:"));
-                System.out.println(tree.toStringTree(parser));
+                System.out.println(ast.toIndentedString());
 
                 // ---------------------------------------------------------
                 // 3. ANÁLISIS SEMÁNTICO
@@ -197,15 +205,31 @@ public class LexerMain {
                 List<Optimizer> optimizers = List.of(
                     new ConstantPropagationOptimizer(),
                     new ExpressionSimplifierOptimizer(),
-                    new DeadCodeEliminationOptimizer());
-                IntermediateCode current = intermediateCode;
+                    new CopyPropagationOptimizer(),
+                    new DeadCodeEliminationOptimizer(),
+                    new MLDeadCodeOptimizer());
+
+                IntermediateCode originalCode = intermediateCode;
+                IntermediateCode current = originalCode;
                 List<String> optimizationExplanations = new ArrayList<>();
 
-                for (Optimizer optimizer : optimizers) {
-                    IntermediateCode before = current;
-                    IntermediateCode after = optimizer.optimize(current);
-                    optimizationExplanations.add(AIRecommendationService.explainOptimizationPass(optimizer.getName(), before.getInstructions(), after.getInstructions()));
-                    current = after;
+                // Iteratively apply the optimizer pipeline until no improvement or max iterations reached.
+                final int MAX_ITER = 10;
+                boolean improved = true;
+                int iter = 0;
+
+                while (improved && iter < MAX_ITER && current.getInstructions().size() >= originalCode.getInstructions().size()) {
+                    improved = false;
+                    iter++;
+                    for (Optimizer optimizer : optimizers) {
+                        IntermediateCode before = current;
+                        IntermediateCode after = optimizer.optimize(current);
+                        optimizationExplanations.add(AIRecommendationService.explainOptimizationPass(optimizer.getName() + " (iter " + iter + ")", before.getInstructions(), after.getInstructions()));
+                        if (after.getInstructions().size() < before.getInstructions().size()) {
+                            improved = true;
+                        }
+                        current = after;
+                    }
                 }
 
                 IntermediateCode optimizedCode = current;

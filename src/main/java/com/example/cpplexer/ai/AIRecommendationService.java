@@ -55,6 +55,7 @@ public class AIRecommendationService {
 
     public static String explainOptimizationPass(String optimizerName, List<String> before, List<String> after) {
         int removed = before.size() - after.size();
+        boolean contentChanged = !before.equals(after);
         StringJoiner report = new StringJoiner(" ");
         report.add("[IA] Optimización:").add(optimizerName + ".");
 
@@ -62,6 +63,8 @@ public class AIRecommendationService {
             report.add("Se eliminaron").add(String.valueOf(removed)).add("instrucción(es) redundantes o simplificables.");
         } else if (removed < 0) {
             report.add("Se generaron").add(String.valueOf(-removed)).add("instrucción(es) adicionales para preservar el comportamiento durante la optimización.");
+        } else if (contentChanged) {
+            report.add("No cambió la cantidad de instrucciones, pero sí su contenido.");
         } else {
             report.add("No se encontraron cambios netos en esta etapa.");
         }
@@ -70,8 +73,10 @@ public class AIRecommendationService {
             report.add("Esta etapa reemplaza valores conocidos con constantes para simplificar expresiones posteriores.");
         } else if (optimizerName.toLowerCase().contains("simplific")) {
             report.add("Esta etapa reduce expresiones aritméticas triviales como x + 0 o x * 1.");
+        } else if (optimizerName.toLowerCase().contains("copia")) {
+            report.add("Esta etapa propaga valores equivalentes para exponer copias redundantes y habilitar otras eliminaciones.");
         } else if (optimizerName.toLowerCase().contains("muerto")) {
-            report.add("Esta etapa elimina temporales que se generan pero nunca se usan.");
+            report.add("Esta etapa elimina asignaciones y declaraciones de variables que no se usan en el programa.");
         }
 
         return report.toString();
